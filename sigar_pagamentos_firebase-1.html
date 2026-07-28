@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGAR — Portal de Pagamentos | Moztechwave</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<!-- FIREBASE -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, doc, setDoc, getDocs, addDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const app = initializeApp({
+    apiKey: "AIzaSyDKfHUopcqVmYlDZzRhBPKEYiohuCkypB0",
+    authDomain: "sigar-6754a.firebaseapp.com",
+    projectId: "sigar-6754a",
+    storageBucket: "sigar-6754a.firebasestorage.app",
+    messagingSenderId: "43374879446",
+    appId: "1:43374879416:web:cf96eeb62e6f940fb50a4d"
+  });
+  const db = getFirestore(app);
+
+  window.FDB = {
+    async findAluno(q) {
+      const snap = await getDocs(collection(db, 'alunos'));
+      const all = snap.docs.map(d => ({id: d.id, ...d.data()}));
+      const ql = q.toLowerCase().trim();
+      return all.filter(a =>
+        (a.bi && a.bi.toLowerCase().includes(ql)) ||
+        (a.numAluno && a.numAluno.toLowerCase().includes(ql)) ||
+        (a.nome && a.nome.toLowerCase().includes(ql))
+      );
+    },
+    async getPaymentsByAluno(aid) {
+      const snap = await getDocs(query(collection(db, 'payments'), where('studentId', '==', aid)));
+      return snap.docs.map(d => ({id: d.id, ...d.data()}));
+    },
+    async savePayment(data) {
+      const ref = await addDoc(collection(db, 'payments'), {
+        ...data, createdAt: serverTimestamp(), ts: Date.now()
+      });
+      return ref.id;
+    },
+    // Also save aluno if from inscription site (not yet in Firebase)
+    async saveAluno(id, data) {
+      await setDoc(doc(db, 'alunos', id), {...data, updatedAt: serverTimestamp()}, {merge: true});
+    }
+  };
+
+  window.FDB_READY = true;
+  document.dispatchEvent(new Event('fdb-ready'));
+  console.log('✅ Firebase ligado — Portal de Pagamentos');
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#1B3A6B;--blue2:#1E4D8C;--gold:#C9A02A;--gold2:#E8B830;
+  --dark:#0D1E3A;--white:#fff;--off:#F4F6FB;--gray:#6B7280;
+  --lgray:#E5E9F0;--green:#16A34A;--red:#DC2626;--orange:#D97706;
+  --radius:12px;--shadow:0 4px 24px rgba(27,58,107,0.12);
+}
+body{font-family:'Inter',sans-serif;background:var(--off);color:var(--dark);min-height:100vh}
+
+nav{background:var(--blue);padding:0 20px;height:60px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 16px rgba(0,0,0,.2);position:sticky;top:0;z-index:100}
+.nav-brand{display:flex;align-items:center;gap:10px}
+.nav-logo{font-size:22px}
+.nav-title{font-family:'Cinzel',serif;color:white;font-size:12px;line-height:1.2}
+.nav-title span{display:block;color:var(--gold);font-size:9px;font-family:'Inter',sans-serif;font-weight:600;letter-spacing:2px}
+.db-status{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:rgba(255,255,255,.7)}
+.db-dot{width:8px;height:8px;border-radius:50%;background:var(--orange);flex-shrink:0;animation:pulse 1.5s ease infinite}
+.db-dot.on{background:var(--green);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.hero{background:linear-gradient(135deg,var(--dark) 0%,var(--blue) 60%,#2A5FA8 100%);padding:40px 20px 32px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 70% 50%,rgba(201,160,42,.1),transparent 70%)}
+.hero-badge{display:inline-block;background:rgba(201,160,42,.15);border:1px solid rgba(201,160,42,.4);color:var(--gold2);font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;padding:5px 16px;border-radius:99px;margin-bottom:14px}
+.hero h1{font-family:'Cinzel',serif;font-size:clamp(20px,4vw,34px);color:var(--white);margin-bottom:8px}
+.hero h1 em{font-style:normal;color:var(--gold2)}
+.hero p{color:rgba(255,255,255,.7);font-size:13px;max-width:480px;margin:0 auto}
+
+.container{max-width:680px;margin:0 auto;padding:24px 16px}
+
+/* STEPS */
+.steps{display:flex;gap:0;margin-bottom:20px;background:var(--off);border-radius:10px;padding:4px}
+.step{flex:1;padding:10px 6px;text-align:center;border-radius:8px;cursor:default;transition:.2s}
+.step.active{background:var(--white);box-shadow:0 1px 6px rgba(0,0,0,.1)}
+.step.done{background:rgba(22,163,74,.08)}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--lgray);color:var(--gray);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 4px}
+.step.active .step-num{background:var(--blue);color:white}
+.step.done .step-num{background:var(--green);color:white}
+.step-lbl{font-size:10px;font-weight:600;color:var(--gray)}
+.step.active .step-lbl{color:var(--blue)}
+.step.done .step-lbl{color:var(--green)}
+
+/* CARDS */
+.card{background:var(--white);border-radius:var(--radius);border:1.5px solid var(--lgray);box-shadow:var(--shadow);overflow:hidden;margin-bottom:20px}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--lgray);display:flex;align-items:center;gap:12px}
+.card-header .icon{font-size:20px}
+.card-header h3{font-size:14px;font-weight:700;color:var(--blue)}
+.card-header p{font-size:11px;color:var(--gray);margin-top:2px}
+.card-body{padding:20px}
+
+/* FORM */
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.fg label{font-size:12px;font-weight:600;color:var(--blue)}
+.fg input,.fg select{border:1.5px solid var(--lgray);border-radius:8px;padding:10px 13px;font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:.2s;background:white;color:var(--dark)}
+.fg input:focus,.fg select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(27,58,107,.08)}
+
+/* STUDENT FOUND */
+.student-found{background:linear-gradient(135deg,rgba(27,58,107,.05),rgba(201,160,42,.05));border:1.5px solid rgba(201,160,42,.3);border-radius:10px;padding:13px 16px;display:flex;align-items:center;gap:13px;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.student-avatar{width:46px;height:46px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0;overflow:hidden}
+.student-avatar img{width:100%;height:100%;object-fit:cover}
+.student-info strong{display:block;font-size:14px;color:var(--blue)}
+.student-info span{font-size:11px;color:var(--gray);display:block;margin-top:1px}
+
+/* MONTHS */
+.months-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.month-btn{border:1.5px solid var(--lgray);border-radius:8px;padding:10px 6px;text-align:center;cursor:pointer;transition:.2s;font-size:11px;font-weight:600;color:var(--gray);user-select:none}
+.month-btn:hover:not(.paid){border-color:var(--blue);color:var(--blue);background:rgba(27,58,107,.04)}
+.month-btn.selected{background:var(--blue);color:white;border-color:var(--blue)}
+.month-btn.paid{background:#D1FAE5;color:#065F46;border-color:#6EE7B7;cursor:default}
+.month-btn.pending{background:#FEF3C7;color:#92400E;border-color:#FCD34D;cursor:default}
+
+/* PAYMENT OPTIONS */
+.pay-opts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.pay-opt{border:2px solid var(--lgray);border-radius:10px;padding:16px;cursor:pointer;transition:.2s;text-align:center}
+.pay-opt:hover{border-color:var(--gold)}
+.pay-opt.selected{border-color:var(--gold);background:rgba(201,160,42,.05)}
+.pay-opt .emoji{font-size:26px;margin-bottom:5px}
+.pay-opt .name{font-weight:700;font-size:13px;color:var(--blue)}
+.pay-opt .number{font-size:15px;font-weight:700;color:var(--gold);letter-spacing:1px;margin:3px 0}
+.pay-opt .hint{font-size:10px;color:var(--gray)}
+
+/* INSTRUCTIONS */
+.instr{background:var(--off);border-radius:10px;padding:16px;margin-bottom:16px;border-left:4px solid var(--gold)}
+.instr h4{font-weight:700;color:var(--blue);margin-bottom:8px;font-size:12px}
+.ref-box{background:var(--blue);color:var(--gold);border-radius:8px;padding:9px 14px;font-size:16px;font-weight:700;text-align:center;letter-spacing:2px;margin:10px 0}
+.instr ol{padding-left:18px;font-size:12px;color:var(--dark);line-height:2.2}
+.instr ol li strong{color:var(--blue)}
+
+/* HISTORY */
+.hist-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--lgray)}
+.hist-item:last-child{border:none}
+.hist-month{font-weight:700;color:var(--blue);font-size:12px}
+.hist-date{font-size:10px;color:var(--gray);margin-top:1px}
+.hist-amt{font-weight:700;font-size:13px}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700}
+.badge.pendente{background:#FEF3C7;color:#92400E}
+.badge.aprovado{background:#D1FAE5;color:#065F46}
+.badge.rejeitado{background:#FEE2E2;color:#991B1B}
+
+/* RECEIPT */
+.receipt{background:white;border:1px solid var(--lgray);border-radius:12px;overflow:hidden;max-width:380px;margin:0 auto}
+.rh{background:var(--blue);padding:16px;text-align:center}
+.rh h3{font-family:'Cinzel',serif;color:var(--gold);font-size:13px;margin-bottom:3px}
+.rh p{color:rgba(255,255,255,.65);font-size:9px}
+.rg{height:3px;background:var(--gold)}
+.rb{padding:16px}
+.rref{text-align:center;margin-bottom:12px}
+.rref .ref{font-size:15px;font-weight:700;color:var(--blue);letter-spacing:2px;background:var(--off);padding:6px 12px;border-radius:5px;display:inline-block;border:1px dashed var(--gold)}
+.rref .dt{font-size:9px;color:var(--gray);margin-top:2px}
+.rrow{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #eee;font-size:11px}
+.rrow:last-child{border:none}
+.rrow .rl{color:var(--gray)}.rrow .rv{font-weight:600;color:var(--dark)}
+.rtot{background:var(--blue);margin:12px -16px -16px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+.rtot .tl{color:rgba(255,255,255,.7);font-size:10px}.rtot .ta{color:var(--gold);font-size:17px;font-weight:700}
+.rf{padding:8px 16px;text-align:center;background:var(--off)}
+.rf p{font-size:9px;color:var(--gray)}
+
+/* SUCCESS */
+.success-box{text-align:center;padding:24px 16px}
+.success-icon{width:60px;height:60px;background:rgba(22,163,74,.1);border:3px solid var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 14px}
+.success-box h2{font-family:'Cinzel',serif;color:var(--blue);font-size:18px;margin-bottom:6px}
+.success-ref{display:inline-block;background:var(--blue);color:var(--gold);padding:7px 18px;border-radius:8px;font-weight:700;font-size:15px;letter-spacing:2px;margin:12px 0}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:.2s;font-family:'Inter',sans-serif;width:100%}
+.btn-primary{background:var(--gold);color:var(--blue)}.btn-primary:hover{background:var(--gold2);transform:translateY(-1px)}
+.btn-blue{background:var(--blue);color:white}.btn-blue:hover{background:var(--blue2)}
+.btn-outline{background:transparent;border:1.5px solid var(--lgray);color:var(--gray)}.btn-outline:hover{border-color:var(--blue);color:var(--blue)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+.btns{display:flex;gap:10px;margin-top:16px}
+.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.loading{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--gray);font-size:13px;padding:16px}
+.spin-b{width:16px;height:16px;border:2px solid var(--lgray);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+
+.toast{position:fixed;bottom:20px;right:20px;background:var(--blue);color:white;padding:12px 16px;border-radius:8px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.2);transform:translateY(60px);opacity:0;transition:.3s;z-index:999;border-left:4px solid var(--gold);max-width:300px}
+.toast.show{transform:translateY(0);opacity:1}
+
+footer{background:var(--dark);color:rgba(255,255,255,.5);text-align:center;padding:20px;font-size:11px;margin-top:40px}
+footer strong{color:var(--gold)}
+
+@media(max-width:500px){.pay-opts{grid-template-columns:1fr}.months-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo">💳</div>
+    <div class="nav-title">SIGAR — Portal de Pagamentos<span>CFTPM MOZTECHWAVE · FIREBASE</span></div>
+  </div>
+  <div class="db-status"><div class="db-dot" id="dbDot"></div><span id="dbLbl">A ligar...</span></div>
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">✦ M-Pesa · e-Mola · Dados em Nuvem ☁️</div>
+  <h1>Portal de <em>Pagamentos</em></h1>
+  <p>Pague a sua mensalidade. O registo é actualizado automaticamente no sistema do Director.</p>
+</div>
+
+<div class="container">
+
+  <!-- STEPS -->
+  <div class="steps">
+    <div class="step active" id="s1"><div class="step-num" id="sn1">1</div><div class="step-lbl">Identificação</div></div>
+    <div class="step" id="s2"><div class="step-num" id="sn2">2</div><div class="step-lbl">Mês</div></div>
+    <div class="step" id="s3"><div class="step-num" id="sn3">3</div><div class="step-lbl">Pagamento</div></div>
+    <div class="step" id="s4"><div class="step-num" id="sn4">4</div><div class="step-lbl">Recibo</div></div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="card" id="step1">
+    <div class="card-header">
+      <div class="icon">👤</div>
+      <div><h3>Identificar-se</h3><p>Introduza o seu BI, número de aluno ou nome</p></div>
+    </div>
+    <div class="card-body">
+      <div class="fg">
+        <label>B.I. / Número de Aluno / Nome *</label>
+        <input type="text" id="searchId" placeholder="Ex: 030100934662I ou MTW-2026-001 ou Ana Machava" oninput="searchStudent()">
+      </div>
+      <div id="searchLoading" style="display:none"><div class="loading"><div class="spin-b"></div>A pesquisar no Firebase...</div></div>
+      <div id="studentResult"></div>
+      <div class="btns">
+        <button class="btn btn-blue" onclick="goNext(1)" id="btn1" disabled>Continuar →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="card" id="step2" style="display:none">
+    <div class="card-header">
+      <div class="icon">📅</div>
+      <div><h3>Seleccionar Mês</h3><p>Escolha o mês que pretende pagar</p></div>
+    </div>
+    <div class="card-body">
+      <div id="sc2"></div>
+      <div class="months-grid" id="monthsGrid"></div>
+      <div id="monthInfo" style="display:none;background:var(--off);border-radius:8px;padding:11px 14px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;font-size:13px">
+          <span style="color:var(--gray)">Mês seleccionado:</span>
+          <strong id="selMes" style="color:var(--blue)">—</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:4px">
+          <span style="color:var(--gray)">Valor:</span>
+          <strong id="selVal" style="color:var(--gold)">—</strong>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="btn btn-outline" onclick="goStep(1)">← Voltar</button>
+        <button class="btn btn-blue" onclick="goNext(2)" id="btn2" disabled>Continuar →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="card" id="step3" style="display:none">
+    <div class="card-header">
+      <div class="icon">💳</div>
+      <div><h3>Efectuar Pagamento</h3><p>Escolha o método e siga as instruções</p></div>
+    </div>
+    <div class="card-body">
+      <div id="sc3"></div>
+      <div class="pay-opts">
+        <div class="pay-opt" id="opt-mpesa" onclick="selectPay('mpesa')">
+          <div class="emoji">💚</div>
+          <div class="name">M-Pesa</div>
+          <div class="number">853 181 189</div>
+          <div class="hint">Vodacom Moçambique</div>
+        </div>
+        <div class="pay-opt" id="opt-emola" onclick="selectPay('emola')">
+          <div class="emoji">🔵</div>
+          <div class="name">e-Mola</div>
+          <div class="number">864 826 647</div>
+          <div class="hint">Movitel / e-Mola</div>
+        </div>
+      </div>
+      <div class="instr" id="instr" style="display:none">
+        <h4 id="instrTitle">Como pagar:</h4>
+        <div class="ref-box" id="payRef">REF: —</div>
+        <ol id="instrSteps"></ol>
+      </div>
+      <div id="confirmGroup" style="display:none">
+        <div class="fg">
+          <label>Número de Confirmação da Transacção *</label>
+          <input type="text" id="transNum" placeholder="Ex: CI20123456" oninput="checkPayBtn()">
+          <span style="font-size:11px;color:var(--gray);margin-top:3px">Recebeu este número por SMS após o pagamento</span>
+        </div>
+        <div class="fg">
+          <label>Comprovativo (opcional)</label>
+          <input type="file" id="proofFile" accept="image/*,.pdf" style="border:none;padding:0">
+        </div>
+      </div>
+      <div class="btns">
+        <button class="btn btn-outline" onclick="goStep(2)">← Voltar</button>
+        <button class="btn btn-primary" onclick="submitPayment()" id="btnPay" disabled>✔ Confirmar Pagamento</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="card" id="step4" style="display:none">
+    <div class="card-header">
+      <div class="icon">🧾</div>
+      <div><h3>Recibo de Pagamento</h3><p>Guarde o seu comprovativo</p></div>
+    </div>
+    <div class="card-body">
+      <div class="success-box">
+        <div class="success-icon">✅</div>
+        <h2>Pagamento Submetido!</h2>
+        <p style="color:var(--gray);font-size:13px">O seu pagamento foi registado no Firebase.</p>
+        <p style="color:var(--orange);font-size:12px;margin-top:4px">⏳ Aguarda confirmação do Director</p>
+        <div class="success-ref" id="finalRef">REF: —</div>
+      </div>
+      <div class="receipt" id="receiptBox">
+        <div class="rh">
+          <h3>CFTPM MOZTECHWAVE, E.I.</h3>
+          <p>Nacala-Porto · NUIT: 402029013 · Tel: 864 826 647 · Firebase ☁️</p>
+        </div>
+        <div class="rg"></div>
+        <div class="rb">
+          <div class="rref">
+            <div style="font-size:9px;color:var(--gray);font-weight:600;letter-spacing:2px;margin-bottom:4px">RECIBO DE MENSALIDADE</div>
+            <div class="ref" id="rRef">—</div>
+            <div class="dt" id="rDate">—</div>
+          </div>
+          <div class="rrow"><span class="rl">Nome do Aluno</span><span class="rv" id="rNome">—</span></div>
+          <div class="rrow"><span class="rl">Nº de Aluno</span><span class="rv" id="rNum">—</span></div>
+          <div class="rrow"><span class="rl">Curso</span><span class="rv" id="rCurso">—</span></div>
+          <div class="rrow"><span class="rl">Referente a</span><span class="rv" id="rMes">—</span></div>
+          <div class="rrow"><span class="rl">Método</span><span class="rv" id="rMetodo">—</span></div>
+          <div class="rrow"><span class="rl">Nº Confirmação</span><span class="rv" id="rConfirm">—</span></div>
+          <div class="rrow"><span class="rl">Estado</span><span class="rv"><span class="badge pendente">⏳ Pendente</span></span></div>
+          <div id="receiptQR" style="display:flex;justify-content:center;margin:8px 0"></div>
+          <div class="rtot"><span class="tl">TOTAL PAGO</span><span class="ta" id="rValor">0 MT</span></div>
+        </div>
+        <div class="rf"><p>✦ Obrigado! Válido após confirmação pelo Director ✦</p><p style="margin-top:2px">moztechwavenacala8@gmail.com · SIGAR Firebase</p></div>
+      </div>
+      <div class="btns" style="margin-top:16px">
+        <button class="btn btn-blue" onclick="printReceipt()">🖨️ Imprimir Recibo</button>
+        <button class="btn btn-outline" onclick="location.reload()">Novo Pagamento</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY CARD -->
+  <div class="card" id="histCard" style="display:none">
+    <div class="card-header">
+      <div class="icon">📋</div>
+      <div><h3>Histórico de Pagamentos</h3><p id="histName">—</p></div>
+    </div>
+    <div class="card-body" id="histBody"></div>
+  </div>
+
+</div>
+
+<footer>
+  <strong>CFTPM Moztechwave, E.I.</strong><br>
+  SIGAR — Portal de Pagamentos · Firebase ☁️ · Nacala-Porto · NUIT: 402029013 · 2026
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════
+// GLOBALS
+// ════════════════════════════════════════════════════════════════════════
+const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MPESA='853 181 189';
+const EMOLA='864 826 647';
+
+let currentAluno = null;
+let selectedMonth = null;
+let selectedPay   = null;
+let payRef        = '';
+let searchTimer   = null;
+
+function genRef(){ return 'MTW-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*90000)+10000); }
+function now(){ return new Date().toLocaleDateString('pt-MZ',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+
+// ════════════════════════════════════════════════════════════════════════
+// DB READY
+// ════════════════════════════════════════════════════════════════════════
+document.addEventListener('fdb-ready', () => {
+  document.getElementById('dbDot').classList.add('on');
+  document.getElementById('dbLbl').textContent = '☁️ Firebase Ligado';
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// STEP NAVIGATION
+// ════════════════════════════════════════════════════════════════════════
+function goStep(n){
+  [1,2,3,4].forEach(i=>{
+    document.getElementById('step'+i).style.display = i===n?'block':'none';
+    const dot=document.getElementById('sn'+i);
+    const s=document.getElementById('s'+i);
+    s.classList.remove('active','done');
+    if(i<n){s.classList.add('done');dot.textContent='✔';}
+    else if(i===n){s.classList.add('active');dot.textContent=i;}
+    else dot.textContent=i;
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function goNext(from){
+  if(from===1){
+    if(!currentAluno){showToast('⚠️ Aluno não encontrado',true);return;}
+    buildStep2(); goStep(2);
+  } else if(from===2){
+    if(!selectedMonth){showToast('⚠️ Seleccione um mês',true);return;}
+    buildStep3(); goStep(3);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// STEP 1 — SEARCH (Firebase)
+// ════════════════════════════════════════════════════════════════════════
+function searchStudent(){
+  const q = document.getElementById('searchId').value.trim();
+  const result = document.getElementById('studentResult');
+  const btn1 = document.getElementById('btn1');
+  const loading = document.getElementById('searchLoading');
+
+  if(q.length < 3){
+    result.innerHTML=''; btn1.disabled=true; currentAluno=null;
+    document.getElementById('histCard').style.display='none';
+    loading.style.display='none';
+    return;
+  }
+
+  // Debounce 600ms
+  clearTimeout(searchTimer);
+  loading.style.display='block';
+  result.innerHTML='';
+  btn1.disabled=true;
+
+  searchTimer = setTimeout(async () => {
+    if(!window.FDB_READY){
+      loading.style.display='none';
+      result.innerHTML='<div style="background:#FEF3C7;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400E">⚠️ A aguardar ligação ao Firebase. Tente novamente em segundos.</div>';
+      return;
+    }
+    try {
+      const found = await window.FDB.findAluno(q);
+      loading.style.display='none';
+
+      if(found.length > 0){
+        const a = found[0];
+        currentAluno = a;
+        result.innerHTML = `
+          <div class="student-found">
+            <div class="student-avatar">${a.foto?`<img src="${a.foto}">`:(a.nome[0]||'?').toUpperCase()}</div>
+            <div class="student-info">
+              <strong>${a.nome}</strong>
+              <span>${a.curso}</span>
+              <span>${a.numAluno||a.id} · BI: ${a.bi||'—'}</span>
+            </div>
+            <div style="margin-left:auto">
+              <span style="background:#D1FAE5;color:#065F46;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700">Encontrado ✓</span>
+            </div>
+          </div>`;
+        btn1.disabled=false;
+        loadHistory(a);
+      } else {
+        currentAluno=null;
+        result.innerHTML='<div style="background:#FEE2E2;border-radius:8px;padding:11px 14px;font-size:13px;color:#991B1B;text-align:center">❌ Aluno não encontrado no Firebase.<br><span style="font-size:11px">Verifique os dados ou contacte a secretaria: 864 826 647</span></div>';
+        btn1.disabled=true;
+        document.getElementById('histCard').style.display='none';
+      }
+    } catch(e){
+      loading.style.display='none';
+      result.innerHTML=`<div style="background:#FEE2E2;border-radius:8px;padding:11px 14px;font-size:12px;color:#991B1B">❌ Erro de ligação: ${e.message}</div>`;
+    }
+  }, 600);
+}
+
+async function loadHistory(aluno){
+  try{
+    const pays = await window.FDB.getPaymentsByAluno(aluno.id);
+    const histCard = document.getElementById('histCard');
+    const histBody = document.getElementById('histBody');
+    document.getElementById('histName').textContent = aluno.nome + ' · ' + aluno.curso;
+
+    if(!pays.length){
+      histBody.innerHTML='<p style="text-align:center;color:var(--gray);font-size:12px;padding:16px">Nenhum pagamento registado ainda.</p>';
+    } else {
+      const sorted = [...pays].sort((a,b)=>(b.ts||0)-(a.ts||0));
+      histBody.innerHTML = sorted.map(p=>`
+        <div class="hist-item">
+          <div><div class="hist-month">${p.mes||'—'} ${p.ano||''}</div><div class="hist-date">${p.data||'—'}</div></div>
+          <div style="text-align:right"><div class="hist-amt">${(p.valor||0).toLocaleString()} MT</div><span class="badge ${p.estado||'pendente'}">${p.estado||'pendente'}</span></div>
+        </div>`).join('');
+    }
+    histCard.style.display='block';
+  }catch(e){ console.warn('History error:',e); }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// STEP 2 — MONTHS
+// ════════════════════════════════════════════════════════════════════════
+async function buildStep2(){
+  const a = currentAluno;
+  document.getElementById('sc2').innerHTML = miniCard(a);
+
+  // Get paid months from Firebase
+  let paidMonths=[], pendingMonths=[];
+  try{
+    const pays = await window.FDB.getPaymentsByAluno(a.id);
+    paidMonths = pays.filter(p=>p.estado==='aprovado').map(p=>p.mes+(p.ano||new Date().getFullYear()));
+    pendingMonths = pays.filter(p=>p.estado==='pendente').map(p=>p.mes+(p.ano||new Date().getFullYear()));
+  }catch(e){}
+
+  const year = new Date().getFullYear();
+  const valor = a.valor || 2000;
+
+  document.getElementById('monthsGrid').innerHTML = MONTHS.map((m, i) => {
+    const key = m + year;
+    const isPaid    = paidMonths.includes(key);
+    const isPending = pendingMonths.includes(key);
+    let cls = isPaid ? 'paid' : isPending ? 'pending' : '';
+    let clickable = !isPaid && !isPending;
+
+    let html = '<div class="month-btn ' + cls + '" id="mb' + i + '"';
+    if (clickable) {
+      html += ' onclick="selMonth(' + "'" + m + "'" + ',' + year + ',' + valor + ')"';
+    } else {
+      html += ' style="pointer-events:none" title="' + (isPaid ? 'Já pago' : 'Pagamento pendente') + '"';
+    }
+    html += '>';
+    html += '<div style="font-weight:700">' + m.substring(0,3) + '</div>';
+    html += '<div style="font-size:9px;opacity:.7">' + year + '</div>';
+    html += '<div style="font-size:10px;margin-top:2px">' + (isPaid ? '✅' : isPending ? '⏳' : '') + '</div>';
+    html += '</div>';
+    return html;
+  }).join('');
+
+}
+
+function selMonth(mes,ano,valor){
+  selectedMonth={mes,ano,valor};
+  document.querySelectorAll('.month-btn:not(.paid):not(.pending)').forEach(b=>b.classList.remove('selected'));
+  MONTHS.forEach((m,i)=>{ if(m===mes) document.getElementById('mb'+i)?.classList.add('selected'); });
+  document.getElementById('monthInfo').style.display='block';
+  document.getElementById('selMes').textContent=mes+' '+ano;
+  document.getElementById('selVal').textContent=(valor||0).toLocaleString()+' MT';
+  document.getElementById('btn2').disabled=false;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// STEP 3 — PAYMENT
+// ════════════════════════════════════════════════════════════════════════
+function buildStep3(){
+  document.getElementById('sc3').innerHTML = miniCard(currentAluno);
+  payRef = genRef();
+  document.getElementById('payRef').textContent='REF: '+payRef;
+}
+
+function selectPay(method){
+  selectedPay=method;
+  document.querySelectorAll('.pay-opt').forEach(o=>o.classList.remove('selected'));
+  document.getElementById('opt-'+method).classList.add('selected');
+
+  const num=method==='mpesa'?MPESA:EMOLA;
+  const valor=selectedMonth?(selectedMonth.valor||0).toLocaleString():'___';
+  const instr=document.getElementById('instr');
+  const title=document.getElementById('instrTitle');
+  const steps=document.getElementById('instrSteps');
+
+  instr.style.display='block';
+  document.getElementById('confirmGroup').style.display='block';
+
+  if(method==='mpesa'){
+    title.textContent='Como pagar pelo M-Pesa:';
+    steps.innerHTML=[
+      `No telemóvel Vodacom marque <strong>*150*00#</strong>`,
+      `Seleccione <strong>Transferência → Para Número M-Pesa</strong>`,
+      `Número: <strong>${num}</strong> (CFTPM Moztechwave)`,
+      `Valor: <strong>${valor} MT</strong>`,
+      `Descrição: <strong>escreva o seu nome completo</strong>`,
+      `Confirme com o seu <strong>PIN</strong>`,
+      `Copie o <strong>número da transacção</strong> recebido por SMS e introduza abaixo`,
+    ].map(s=>`<li>${s}</li>`).join('');
+  } else {
+    title.textContent='Como pagar pelo e-Mola:';
+    steps.innerHTML=[
+      `Abra a aplicação <strong>e-Mola</strong> no seu telemóvel`,
+      `Seleccione <strong>Transferir Dinheiro</strong>`,
+      `Número: <strong>${num}</strong> (CFTPM Moztechwave)`,
+      `Valor: <strong>${valor} MT</strong>`,
+      `Descrição: <strong>escreva o seu nome completo</strong>`,
+      `Confirme com o seu <strong>PIN</strong>`,
+      `Copie o <strong>número de confirmação</strong> recebido e introduza abaixo`,
+    ].map(s=>`<li>${s}</li>`).join('');
+  }
+  checkPayBtn();
+}
+
+function checkPayBtn(){
+  const trans=document.getElementById('transNum')?.value.trim();
+  document.getElementById('btnPay').disabled=!selectedPay||!trans;
+}
+
+async function submitPayment(){
+  const transNum=document.getElementById('transNum').value.trim();
+  if(!selectedPay||!transNum){showToast('⚠️ Preencha todos os campos',true);return;}
+
+  const btn=document.getElementById('btnPay');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> A guardar no Firebase...';
+
+  // Proof file
+  let proofBase64=null;
+  const pf=document.getElementById('proofFile').files[0];
+  if(pf){
+    proofBase64=await new Promise(res=>{
+      const r=new FileReader(); r.onload=e=>res(e.target.result); r.readAsDataURL(pf);
+    });
+  }
+
+  const payment={
+    ref: payRef,
+    studentId: currentAluno.id,
+    studentName: currentAluno.nome,
+    numAluno: currentAluno.numAluno||currentAluno.id,
+    curso: currentAluno.curso,
+    mes: selectedMonth.mes,
+    ano: String(selectedMonth.ano),
+    valor: selectedMonth.valor||0,
+    metodo: selectedPay==='mpesa'?`M-Pesa (${MPESA})`:`e-Mola (${EMOLA})`,
+    transNum,
+    proof: proofBase64,
+    estado: 'pendente',
+    data: now(),
+    ts: Date.now(),
+  };
+
+  try{
+    await window.FDB.savePayment(payment);
+    showToast('✅ Pagamento guardado no Firebase!');
+
+    // WhatsApp notification to director
+    const waMsg=encodeURIComponent(
+      `💳 *NOVO PAGAMENTO — SIGAR Moztechwave*\n\n`+
+      `👤 *Aluno:* ${currentAluno.nome}\n`+
+      `📚 *Curso:* ${currentAluno.curso}\n`+
+      `📅 *Mês:* ${selectedMonth.mes} ${selectedMonth.ano}\n`+
+      `💰 *Valor:* ${(selectedMonth.valor||0).toLocaleString()} MT\n`+
+      `💳 *Método:* ${payment.metodo}\n`+
+      `🔢 *Confirmação:* ${transNum}\n`+
+      `📋 *Ref:* ${payRef}\n\n`+
+      `Aguarda aprovação no painel SIGAR!`
+    );
+    setTimeout(()=>window.open(`https://wa.me/258853181189?text=${waMsg}`,'_blank'),500);
+
+    buildReceipt(payment);
+    goStep(4);
+  }catch(e){
+    showToast('❌ Erro ao guardar: '+e.message,true);
+    btn.disabled=false; btn.innerHTML='✔ Confirmar Pagamento';
+  }
+}
+
+function buildReceipt(p){
+  document.getElementById('finalRef').textContent='REF: '+p.ref;
+  document.getElementById('rRef').textContent=p.ref;
+  document.getElementById('rDate').textContent='Data: '+p.data;
+  document.getElementById('rNome').textContent=p.studentName;
+  document.getElementById('rNum').textContent=p.numAluno;
+  document.getElementById('rCurso').textContent=p.curso;
+  document.getElementById('rMes').textContent=p.mes+' '+p.ano;
+  document.getElementById('rMetodo').textContent=p.metodo;
+  document.getElementById('rConfirm').textContent=p.transNum;
+  document.getElementById('rValor').textContent=(p.valor||0).toLocaleString()+' MT';
+
+  const qrDiv=document.getElementById('receiptQR');
+  qrDiv.innerHTML='';
+  new QRCode(qrDiv,{
+    text:`SIGAR MOZTECHWAVE|${p.studentName}|REF:${p.ref}|${p.mes} ${p.ano}|${p.valor} MT|PENDENTE`,
+    width:80,height:80,colorDark:'#1B3A6B',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M
+  });
+}
+
+function printReceipt(){
+  const receipt=document.getElementById('receiptBox');
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Recibo SIGAR</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Inter,Arial,sans-serif;background:#f0f0f0;display:flex;justify-content:center;padding:20px}
+  .receipt{width:380px;background:white;box-shadow:0 4px 20px rgba(0,0,0,.15);border-radius:12px;overflow:hidden}
+  .rh{background:#1B3A6B;padding:16px;text-align:center}.rh h3{font-family:Georgia,serif;color:#C9A02A;font-size:13px;margin-bottom:3px}.rh p{color:rgba(255,255,255,.65);font-size:9px}
+  .rg{height:3px;background:#C9A02A}.rb{padding:16px}
+  .rref{text-align:center;margin-bottom:12px}.rref .ref{font-size:15px;font-weight:700;color:#1B3A6B;letter-spacing:2px;background:#F4F6FB;padding:6px 12px;border-radius:5px;display:inline-block;border:1px dashed #C9A02A}
+  .rref .dt{font-size:9px;color:#6B7280;margin-top:2px}.rrow{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #eee;font-size:11px}.rrow:last-child{border:none}
+  .rl{color:#6B7280}.rv{font-weight:600;color:#1A1A1A}.rtot{background:#1B3A6B;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+  .tl{color:rgba(255,255,255,.7);font-size:10px}.ta{color:#C9A02A;font-size:17px;font-weight:700}
+  .rf{padding:8px 16px;text-align:center;background:#F4F6FB}.rf p{font-size:9px;color:#6B7280}
+  @media print{body{background:white;padding:0}}</style></head>
+  <body><div class="receipt">${receipt.innerHTML}</div>
+  <script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════════════
+function miniCard(a){
+  return `<div class="student-found" style="margin-bottom:16px">
+    <div class="student-avatar">${a.foto?`<img src="${a.foto}">`:(a.nome[0]||'?').toUpperCase()}</div>
+    <div class="student-info">
+      <strong>${a.nome}</strong>
+      <span>${a.curso}</span>
+      <span>${a.numAluno||a.id}</span>
+    </div>
+    <div style="margin-left:auto;text-align:right">
+      <div style="font-size:20px;font-weight:800;color:var(--gold)">${(a.valor||0).toLocaleString()} MT</div>
+      <div style="font-size:10px;color:var(--gray)">mensalidade</div>
+    </div>
+  </div>`;
+}
+
+function showToast(msg,err=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.borderLeftColor=err?'var(--red)':'var(--gold)';
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3500);
+}
+</script>
+</body>
+</html>

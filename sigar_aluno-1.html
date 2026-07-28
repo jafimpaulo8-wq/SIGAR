@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGAR — Portal do Aluno | Moztechwave</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Cinzel:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, doc, getDoc, getDocs, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  const app = initializeApp({
+    apiKey:"AIzaSyDKfHUopcqVmYlDZzRhBPKEYiohuCkypB0",
+    authDomain:"sigar-6754a.firebaseapp.com",
+    projectId:"sigar-6754a",
+    storageBucket:"sigar-6754a.firebasestorage.app",
+    messagingSenderId:"43374879416",
+    appId:"1:43374879416:web:cf96eeb62e6f940fb50a4d"
+  });
+  const db = getFirestore(app);
+  window.ADB = {
+    async findAluno(q) {
+      const snap = await getDocs(collection(db,'alunos'));
+      const all = snap.docs.map(d=>({id:d.id,...d.data()}));
+      const ql = q.toLowerCase().trim();
+      return all.filter(a=>
+        (a.bi&&a.bi.toLowerCase().includes(ql))||
+        (a.numAluno&&a.numAluno.toLowerCase().includes(ql))||
+        (a.nome&&a.nome.toLowerCase().includes(ql))
+      );
+    },
+    onPayments(alunoId,cb){
+      return onSnapshot(query(collection(db,'payments'),where('studentId','==',alunoId)),snap=>{
+        cb(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ts||0)-(a.ts||0)));
+      });
+    },
+    onFrequencias(alunoId,cb){
+      return onSnapshot(query(collection(db,'frequencias'),where('studentId','==',alunoId)),snap=>{
+        cb(snap.docs.map(d=>({id:d.id,...d.data()})));
+      });
+    },
+    async getEstagios(alunoId){
+      const snap = await getDocs(query(collection(db,'estagios'),where('studentId','==',alunoId)));
+      return snap.docs.map(d=>({id:d.id,...d.data()}));
+    },
+    onComunicados(cb){
+      return onSnapshot(collection(db,'comunicados'),snap=>{
+        cb(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ts||0)-(a.ts||0)));
+      });
+    },
+  };
+  window.ADB_READY=true;
+  document.dispatchEvent(new Event('adb-ready'));
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--blue:#1B3A6B;--blue2:#1E4D8C;--gold:#C9A02A;--gold2:#E8B830;--dark:#0D1E3A;--white:#fff;--off:#F4F6FB;--gray:#6B7280;--lgray:#E5E9F0;--green:#16A34A;--red:#DC2626;--orange:#D97706;--radius:12px;--shadow:0 4px 24px rgba(27,58,107,0.12)}
+body{font-family:'Inter',sans-serif;background:var(--off);color:var(--dark);min-height:100vh}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,var(--dark) 0%,var(--blue) 60%,#2A5FA8 100%)}
+.login-card{background:white;border-radius:20px;padding:36px 28px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.login-logo{text-align:center;margin-bottom:20px}
+.login-logo .icon{font-size:46px;margin-bottom:8px}
+.login-logo h1{font-family:'Cinzel',serif;color:var(--blue);font-size:19px;margin-bottom:4px}
+.login-logo p{font-size:12px;color:var(--gray)}
+.db-badge{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:var(--gray);margin-bottom:18px}
+.db-dot{width:7px;height:7px;border-radius:50%;background:var(--orange);animation:pulse 1.5s ease infinite}
+.db-dot.on{background:var(--green);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.app{display:none}.app.visible{display:block}
+nav{background:var(--blue);padding:0 16px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.2)}
+.nav-title{font-family:'Cinzel',serif;color:white;font-size:11px;line-height:1.2}
+.nav-title span{display:block;color:var(--gold);font-size:9px;font-family:'Inter',sans-serif;font-weight:600;letter-spacing:2px}
+.nav-av{width:30px;height:30px;border-radius:50%;border:2px solid var(--gold);background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;overflow:hidden;flex-shrink:0}
+.nav-av img{width:100%;height:100%;object-fit:cover}
+.nav-out{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif}
+.hero-card{background:linear-gradient(135deg,var(--blue),var(--blue2));margin:16px;border-radius:14px;padding:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.hero-photo{width:72px;height:86px;border-radius:8px;border:3px solid var(--gold);background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:var(--gold);flex-shrink:0;overflow:hidden}
+.hero-photo img{width:100%;height:100%;object-fit:cover}
+.hero-tag{display:inline-block;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.8);padding:3px 9px;border-radius:99px;font-size:10px;margin-right:4px;margin-bottom:4px}
+.hero-tag.gold{background:rgba(201,160,42,.2);border-color:rgba(201,160,42,.4);color:var(--gold)}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0 16px 16px}
+.stat{background:var(--white);border-radius:10px;padding:14px;border:1.5px solid var(--lgray);display:flex;align-items:center;gap:10px}
+.stat-ic{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.ib{background:rgba(27,58,107,.1)}.ig{background:rgba(201,160,42,.1)}.iv{background:rgba(22,163,74,.1)}.ir{background:rgba(220,38,38,.1)}
+.stat-val{font-size:20px;font-weight:800;color:var(--blue);line-height:1}
+.stat-lbl{font-size:10px;color:var(--gray);margin-top:2px}
+.tabs-nav{display:flex;background:white;border-bottom:1px solid var(--lgray);padding:0 16px;overflow-x:auto;position:sticky;top:58px;z-index:90;box-shadow:0 2px 6px rgba(0,0,0,.04)}
+.tab-btn{padding:12px 14px;font-size:12px;font-weight:600;color:var(--gray);border:none;background:none;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;transition:.2s;font-family:'Inter',sans-serif}
+.tab-btn.active{color:var(--blue);border-bottom-color:var(--gold)}
+.tab-pane{display:none;padding:16px}.tab-pane.active{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.card{background:var(--white);border-radius:var(--radius);border:1.5px solid var(--lgray);margin-bottom:14px;overflow:hidden}
+.ch{padding:12px 16px;border-bottom:1px solid var(--lgray);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.ch h3{font-size:13px;font-weight:700;color:var(--blue)}
+.cb{padding:16px}
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700}
+.badge.aprovado,.badge.pago,.badge.presente{background:#D1FAE5;color:#065F46}
+.badge.pendente{background:#FEF3C7;color:#92400E}
+.badge.rejeitado,.badge.falta,.badge.reprovado{background:#FEE2E2;color:#991B1B}
+.badge.activo{background:#DBEAFE;color:#1E40AF}
+.month-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.month-item{border-radius:8px;padding:10px 6px;text-align:center;font-size:11px;font-weight:700;border:1.5px solid var(--lgray)}
+.month-item.paid{background:#D1FAE5;color:#065F46;border-color:#6EE7B7}
+.month-item.pending{background:#FEF3C7;color:#92400E;border-color:#FCD34D}
+.month-item.unpaid{background:var(--lgray);color:var(--gray)}
+.pay-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--lgray)}
+.pay-item:last-child{border:none}
+.grade-circle{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800}
+.grade-circle.pass{background:#D1FAE5;color:#065F46;border:3px solid #6EE7B7}
+.grade-circle.fail{background:#FEE2E2;color:#991B1B;border:3px solid #FCA5A5}
+.grade-circle.empty{background:var(--lgray);color:var(--gray);border:3px solid var(--lgray)}
+.prog{height:7px;background:var(--lgray);border-radius:99px;overflow:hidden;margin-top:4px}
+.prog-bar{height:100%;border-radius:99px;background:var(--green)}
+.prog-bar.warn{background:var(--orange)}.prog-bar.danger{background:var(--red)}
+.alert{border-radius:8px;padding:11px 13px;font-size:12px;margin-bottom:12px;border:1px solid}
+.alert.info{background:#DBEAFE;color:#1E40AF;border-color:#BFDBFE}
+.alert.warn{background:#FEF3C7;color:#92400E;border-color:#FCD34D}
+.alert.success{background:#D1FAE5;color:#065F46;border-color:#6EE7B7}
+.alert.error{background:#FEE2E2;color:#991B1B;border-color:#FCA5A5}
+/* BOTÃO PAGAR */
+.pagar-btn{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:white;border-radius:12px;padding:18px;margin-bottom:14px;cursor:pointer;text-decoration:none;transition:.2s;border:none;width:100%}
+.pagar-btn:hover{opacity:.92;transform:translateY(-1px);box-shadow:0 6px 20px rgba(27,58,107,.3)}
+.pagar-btn .pb-icon{font-size:32px;flex-shrink:0}
+.pagar-btn .pb-title{font-size:15px;font-weight:800;color:white}
+.pagar-btn .pb-sub{font-size:11px;color:rgba(255,255,255,.75);margin-top:2px}
+.pagar-btn .pb-arrow{font-size:24px;margin-left:auto;color:var(--gold)}
+.rec{background:white;border:1px solid var(--lgray);border-radius:10px;overflow:hidden;max-width:340px;margin:0 auto}
+.rh{background:var(--blue);padding:13px;text-align:center}
+.rh h4{font-family:'Cinzel',serif;color:var(--gold);font-size:12px;margin-bottom:2px}
+.rh p{color:rgba(255,255,255,.6);font-size:9px}
+.rg{height:3px;background:var(--gold)}.rb{padding:13px}
+.rrow{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #eee;font-size:11px}
+.rrow:last-child{border:none}.rl{color:var(--gray)}.rv{font-weight:600;color:var(--dark)}
+.rtot{background:var(--blue);padding:10px 13px;display:flex;justify-content:space-between;align-items:center}
+.tl{color:rgba(255,255,255,.7);font-size:10px}.ta{color:var(--gold);font-size:15px;font-weight:700}
+.rf{padding:7px 13px;text-align:center;background:var(--off);font-size:9px;color:var(--gray)}
+.fg{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.fg label{font-size:11px;font-weight:600;color:var(--blue)}
+.fg input{border:1.5px solid var(--lgray);border-radius:8px;padding:10px 13px;font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:.2s;background:white;color:var(--dark)}
+.fg input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(27,58,107,.08)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:.2s;font-family:'Inter',sans-serif;width:100%}
+.btn-blue{background:var(--blue);color:white}.btn-gold{background:var(--gold);color:var(--blue)}
+.btn-outline{background:transparent;border:1.5px solid var(--lgray);color:var(--gray)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.loading{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--gray);font-size:13px;padding:24px}
+.spin{width:18px;height:18px;border:2px solid var(--lgray);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--blue);color:white;padding:11px 15px;border-radius:8px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.2);transform:translateY(60px);opacity:0;transition:.3s;z-index:999;border-left:4px solid var(--gold);max-width:300px}
+.toast.show{transform:translateY(0);opacity:1}
+.mov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:center;justify-content:center;padding:16px}
+.mov.open{display:flex;animation:fadeIn .2s}
+.modal{background:white;border-radius:14px;max-width:380px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.mh{padding:14px 18px;border-bottom:1px solid var(--lgray);display:flex;align-items:center;justify-content:space-between}
+.mh h3{font-size:14px;font-weight:700;color:var(--blue)}
+.mc{background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray)}
+.mb{padding:18px}.mf{padding:10px 18px;border-top:1px solid var(--lgray);display:flex;justify-content:flex-end;gap:8px}
+footer{background:var(--dark);color:rgba(255,255,255,.5);text-align:center;padding:18px;font-size:11px;margin-top:30px}
+footer strong{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <div class="login-logo"><div class="icon">🎓</div><h1>Portal do Aluno</h1><p>SIGAR — CFTPM Moztechwave</p></div>
+    <div class="db-badge"><div class="db-dot" id="dbDot"></div><span id="dbLbl">A ligar ao Firebase...</span></div>
+    <div class="fg">
+      <label>B.I. / Número de Aluno / Nome *</label>
+      <input type="text" id="loginId" placeholder="Ex: 030100934662I ou MTW-2026-001" oninput="doSearch()">
+    </div>
+    <div id="loginLoading" style="display:none" class="loading"><div class="spin"></div>A pesquisar no Firebase...</div>
+    <div id="loginResult" style="margin-bottom:12px"></div>
+    <button class="btn btn-blue" id="loginBtn" onclick="doLogin()" disabled>Entrar no Portal →</button>
+    <p style="text-align:center;font-size:11px;color:var(--gray);margin-top:14px">Problemas? Contacte a secretaria:<br><strong style="color:var(--blue)">864 826 647 · 853 181 189</strong></p>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <nav>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:20px">🎓</span>
+      <div class="nav-title">Portal do Aluno<span>SIGAR · MOZTECHWAVE · FIREBASE ☁️</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="nav-av" id="navAv">?</div>
+      <span style="font-size:11px;color:rgba(255,255,255,.8);font-weight:600" id="navName">—</span>
+      <button class="nav-out" onclick="doLogout()">Sair</button>
+    </div>
+  </nav>
+
+  <div class="hero-card">
+    <div class="hero-photo" id="heroPhoto">?</div>
+    <div style="flex:1">
+      <div style="font-family:'Cinzel',serif;font-size:17px;color:white;margin-bottom:3px" id="heroName">—</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.65);margin-bottom:8px" id="heroSub">—</div>
+      <div>
+        <span class="hero-tag" id="heroCurso">—</span>
+        <span class="hero-tag" id="heroHorario">—</span>
+        <span class="hero-tag gold" id="heroEstado">—</span>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:10px;color:rgba(255,255,255,.6)">Mensalidade</div>
+      <div style="font-size:22px;font-weight:800;color:var(--gold)" id="heroValor">0 MT</div>
+      <div style="font-size:9px;color:rgba(255,255,255,.5)">por mês</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-ic iv">💳</div><div><div class="stat-val" id="stMeses">—</div><div class="stat-lbl">Meses Pagos</div></div></div>
+    <div class="stat"><div class="stat-ic ib">📋</div><div><div class="stat-val" id="stMedia">—</div><div class="stat-lbl">Média Final</div></div></div>
+    <div class="stat"><div class="stat-ic ig">✅</div><div><div class="stat-val" id="stAssid">—</div><div class="stat-lbl">Assiduidade</div></div></div>
+    <div class="stat"><div class="stat-ic ir">❌</div><div><div class="stat-val" id="stFaltas">0</div><div class="stat-lbl">Faltas</div></div></div>
+  </div>
+
+  <div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('inicio')">🏠 Início</button>
+    <button class="tab-btn" onclick="switchTab('pagamentos')">💳 Pagamentos</button>
+    <button class="tab-btn" onclick="switchTab('notas')">📋 Notas</button>
+    <button class="tab-btn" onclick="switchTab('presencas')">✅ Presenças</button>
+    <button class="tab-btn" onclick="switchTab('estagio')">🏢 Estágio</button>
+    <button class="tab-btn" onclick="switchTab('certificado')">🏆 Certificado</button>
+    <button class="tab-btn" onclick="switchTab('perfil')">👤 Perfil</button>
+  </div>
+
+  <div class="tab-pane active" id="tab-inicio">
+    <div id="alertas"></div>
+    <div class="card"><div class="ch"><h3>💳 Últimos Pagamentos</h3><button class="btn-outline btn" style="width:auto;padding:4px 10px;font-size:11px" onclick="switchTab('pagamentos')">Ver todos</button></div><div class="cb" id="ini-pays"><div class="loading"><div class="spin"></div></div></div></div>
+    <div class="card"><div class="ch"><h3>📋 Resumo de Notas</h3></div><div class="cb" id="ini-notas"><div class="loading"><div class="spin"></div></div></div></div>
+    <div class="card"><div class="ch"><h3>📢 Comunicados</h3></div><div class="cb" id="ini-coms"><div class="loading"><div class="spin"></div></div></div></div>
+  </div>
+
+  <div class="tab-pane" id="tab-pagamentos">
+    <!-- BOTÃO GRANDE PARA PAGAR -->
+    <a class="pagar-btn" id="pagarBtn" href="sigar_pagamentos_firebase.html" target="_blank">
+      <div class="pb-icon">💳</div>
+      <div>
+        <div class="pb-title">Efectuar Novo Pagamento</div>
+        <div class="pb-sub">Clique aqui · M-Pesa · e-Mola · Rápido e Seguro</div>
+      </div>
+      <div class="pb-arrow">→</div>
+    </a>
+    <div class="card"><div class="ch"><h3>📅 Estado das Mensalidades — <span id="payYear"></span></h3></div><div class="cb"><div class="month-grid" id="monthGrid"></div><div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px"><span style="display:flex;align-items:center;gap:4px"><span style="width:11px;height:11px;border-radius:3px;background:#D1FAE5;border:1px solid #6EE7B7;display:inline-block"></span>Pago ✅</span><span style="display:flex;align-items:center;gap:4px"><span style="width:11px;height:11px;border-radius:3px;background:#FEF3C7;border:1px solid #FCD34D;display:inline-block"></span>Pendente ⏳</span><span style="display:flex;align-items:center;gap:4px"><span style="width:11px;height:11px;border-radius:3px;background:var(--lgray);display:inline-block"></span>Não pago</span></div></div></div>
+    <div class="card"><div class="ch"><h3>🧾 Histórico Completo</h3><span id="payTotal" style="font-size:12px;font-weight:700;color:var(--gold)"></span></div><div class="cb" id="payHistory"><div class="loading"><div class="spin"></div></div></div></div>
+  </div>
+
+  <div class="tab-pane" id="tab-notas">
+    <div class="card"><div class="ch"><h3>📋 As Minhas Notas</h3><span style="font-size:10px;color:var(--gray)">Apenas leitura</span></div><div class="cb"><div class="alert info">ℹ️ Notas lançadas pelo Professor e validadas pelo Director.</div><div id="notasContent"><div class="loading"><div class="spin"></div></div></div></div></div>
+  </div>
+
+  <div class="tab-pane" id="tab-presencas">
+    <div class="card"><div class="ch"><h3>✅ Registo de Presenças</h3></div><div class="cb"><div id="presResumo" style="margin-bottom:14px"></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--blue)"><th style="padding:8px 10px;text-align:left;color:var(--gold);font-size:11px">Data</th><th style="padding:8px 10px;text-align:center;color:var(--gold);font-size:11px">Presença</th><th style="padding:8px 10px;text-align:left;color:var(--gold);font-size:11px">Obs.</th></tr></thead><tbody id="presTbody"><tr><td colspan="3"><div class="loading"><div class="spin"></div></div></td></tr></tbody></table></div></div></div>
+  </div>
+
+  <div class="tab-pane" id="tab-estagio">
+    <div class="card"><div class="ch"><h3>🏢 O Meu Estágio</h3></div><div class="cb" id="estagioContent"><div class="loading"><div class="spin"></div></div></div></div>
+  </div>
+
+  <div class="tab-pane" id="tab-certificado">
+    <div class="card"><div class="ch"><h3>🏆 O Meu Certificado</h3></div><div class="cb" id="certContent"><div class="loading"><div class="spin"></div></div></div></div>
+  </div>
+
+  <div class="tab-pane" id="tab-perfil">
+    <div class="card"><div class="ch"><h3>👤 O Meu Perfil</h3></div><div class="cb" id="perfilContent"><div class="loading"><div class="spin"></div></div></div></div>
+    <div class="card"><div class="ch"><h3>🪪 Cartão de Estudante</h3></div><div class="cb"><div id="cartaoPreview" style="display:flex;justify-content:center;margin-bottom:14px"></div><button class="btn btn-blue" onclick="imprimirCartao()">🖨️ Imprimir Cartão</button></div></div>
+  </div>
+</div>
+
+<!-- MODAL RECIBO -->
+<div class="mov" id="mRecibo">
+  <div class="modal">
+    <div class="mh"><h3>🧾 Recibo</h3><button class="mc" onclick="closeM('mRecibo')">✕</button></div>
+    <div class="mb" id="mRecBody"></div>
+    <div class="mf"><button class="btn btn-outline" style="width:auto" onclick="closeM('mRecibo')">Fechar</button><button class="btn btn-blue" style="width:auto" onclick="printRec()">🖨️ Imprimir</button></div>
+  </div>
+</div>
+
+<footer><strong>CFTPM Moztechwave, E.I.</strong><br>SIGAR · Portal do Aluno · Firebase ☁️ · Nacala-Porto · NUIT: 402029013</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+let currentAluno=null,foundAluno=null,allPays=[],allFreqs=[],unsubPays=null,unsubFreqs=null,unsubComs=null,searchTimer=null;
+
+document.addEventListener('adb-ready',()=>{
+  document.getElementById('dbDot').classList.add('on');
+  document.getElementById('dbLbl').textContent='☁️ Firebase Ligado';
+  document.getElementById('loginBtn').disabled=false;
+  // Auto-fill from URL
+  const bi=new URLSearchParams(window.location.search).get('bi');
+  if(bi){document.getElementById('loginId').value=bi;doSearch();}
+});
+
+function doSearch(){
+  const q=document.getElementById('loginId').value.trim();
+  const result=document.getElementById('loginResult');
+  const loading=document.getElementById('loginLoading');
+  const btn=document.getElementById('loginBtn');
+  if(q.length<3){result.innerHTML='';btn.disabled=true;foundAluno=null;loading.style.display='none';return;}
+  clearTimeout(searchTimer);loading.style.display='flex';result.innerHTML='';btn.disabled=true;
+  searchTimer=setTimeout(async()=>{
+    if(!window.ADB_READY){loading.style.display='none';return;}
+    try{
+      const found=await window.ADB.findAluno(q);
+      loading.style.display='none';
+      if(found.length>0){
+        foundAluno=found[0];const a=foundAluno;
+        result.innerHTML=`<div style="background:#D1FAE5;border:1px solid #6EE7B7;border-radius:8px;padding:11px 14px;display:flex;align-items:center;gap:11px">
+          <div style="width:38px;height:38px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;overflow:hidden;flex-shrink:0">${a.foto?`<img src="${a.foto}" style="width:100%;height:100%;object-fit:cover">`:a.nome[0].toUpperCase()}</div>
+          <div><div style="font-weight:700;color:#065F46;font-size:14px">${a.nome}</div><div style="font-size:11px;color:#065F46">${a.curso} · ${a.numAluno||a.id}</div></div>
+          <span style="margin-left:auto;font-size:10px;font-weight:700;background:#065F46;color:white;padding:2px 8px;border-radius:99px">✓ Encontrado</span></div>`;
+        btn.disabled=false;
+      }else{foundAluno=null;result.innerHTML=`<div style="background:#FEE2E2;border-radius:8px;padding:10px 14px;font-size:13px;color:#991B1B">❌ Aluno não encontrado. Contacte a secretaria: 864 826 647</div>`;btn.disabled=true;}
+    }catch(e){loading.style.display='none';result.innerHTML=`<div style="background:#FEE2E2;border-radius:8px;padding:10px;font-size:12px;color:#991B1B">❌ Erro: ${e.message}</div>`;}
+  },600);
+}
+
+function doLogin(){
+  if(!foundAluno)return;
+  currentAluno=foundAluno;
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('app').classList.add('visible');
+  buildApp();
+}
+
+function doLogout(){
+  if(unsubPays)unsubPays();if(unsubFreqs)unsubFreqs();if(unsubComs)unsubComs();
+  currentAluno=null;foundAluno=null;allPays=[];allFreqs=[];
+  document.getElementById('loginWrap').style.display='flex';
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('loginId').value='';
+  document.getElementById('loginResult').innerHTML='';
+  document.getElementById('loginBtn').disabled=true;
+}
+
+function buildApp(){
+  const a=currentAluno;
+  const navAv=document.getElementById('navAv');
+  if(a.foto)navAv.innerHTML=`<img src="${a.foto}">`;else navAv.textContent=a.nome[0].toUpperCase();
+  document.getElementById('navName').textContent=a.nome.split(' ')[0];
+  const heroPhoto=document.getElementById('heroPhoto');
+  if(a.foto)heroPhoto.innerHTML=`<img src="${a.foto}">`;else heroPhoto.textContent=a.nome[0].toUpperCase();
+  document.getElementById('heroName').textContent=a.nome;
+  document.getElementById('heroSub').textContent=(a.numAluno||a.id)+' · BI: '+(a.bi||'—');
+  document.getElementById('heroCurso').textContent=a.curso;
+  document.getElementById('heroHorario').textContent=a.horario||'—';
+  document.getElementById('heroEstado').textContent=a.estado||'activo';
+  document.getElementById('heroValor').textContent=(a.valor||0).toLocaleString()+' MT';
+  // Payment link pre-fills BI
+  document.getElementById('pagarBtn').href=`sigar_pagamentos_firebase.html?bi=${encodeURIComponent(a.bi||a.numAluno||'')}`;
+  buildNotas(a);buildPerfil(a);buildEstagio(a);
+  unsubPays=window.ADB.onPayments(a.id,pays=>{allPays=pays;updateStats();buildPagamentos();buildInicioSummary();});
+  unsubFreqs=window.ADB.onFrequencias(a.id,freqs=>{allFreqs=freqs;updateStats();buildPresencas();});
+  unsubComs=window.ADB.onComunicados(coms=>{buildComunicados(coms);});
+}
+
+function updateStats(){
+  const a=currentAluno;
+  document.getElementById('stMeses').textContent=allPays.filter(p=>p.estado==='aprovado').length;
+  const n=a.notas||{};
+  const media=n.t1&&n.t2&&n.exame?((+n.t1+ +n.t2+ +n.exame)/3).toFixed(1):'—';
+  const sm=document.getElementById('stMedia');
+  sm.textContent=media+(media!=='—'?' v.':'');
+  sm.style.color=media!=='—'?(+media>=10?'var(--green)':'var(--red)'):'var(--blue)';
+  const faltas=allFreqs.filter(f=>!f.presente).length;
+  const total=allFreqs.length;
+  const assid=total>0?Math.round(((total-faltas)/total)*100):100;
+  document.getElementById('stAssid').textContent=assid+'%';
+  document.getElementById('stAssid').style.color=assid<75?'var(--red)':assid<90?'var(--orange)':'var(--green)';
+  document.getElementById('stFaltas').textContent=faltas;
+}
+
+function buildInicioSummary(){
+  const a=currentAluno;
+  const aprov=allPays.filter(p=>p.estado==='aprovado');
+  const pend=allPays.filter(p=>p.estado==='pendente');
+  const n=a.notas||{};
+  const media=n.t1&&n.t2&&n.exame?((+n.t1+ +n.t2+ +n.exame)/3).toFixed(1):null;
+  const faltas=allFreqs.filter(f=>!f.presente).length;
+  const total=allFreqs.length;
+  const assid=total>0?Math.round(((total-faltas)/total)*100):100;
+  const alerts=[];
+  if(pend.length)alerts.push(`<div class="alert warn">⏳ Tem ${pend.length} pagamento(s) pendente(s) de confirmação.</div>`);
+  if(assid<75)alerts.push(`<div class="alert error">⚠️ Assiduidade abaixo do mínimo! (${assid}% — mínimo: 75%)</div>`);
+  if(media&&+media<10)alerts.push(`<div class="alert error">❌ Média de ${media} val. está abaixo do mínimo.</div>`);
+  if(media&&+media>=10)alerts.push(`<div class="alert success">🎓 Parabéns! Média de ${media} valores — Aprovado(a)!</div>`);
+  document.getElementById('alertas').innerHTML=alerts.join('');
+  document.getElementById('ini-pays').innerHTML=allPays.slice(0,4).map(p=>`
+    <div class="pay-item">
+      <div><div style="font-weight:700;color:var(--blue);font-size:13px">${p.mes||'—'} ${p.ano||''}</div><div style="font-size:10px;color:var(--gray)">${p.data||'—'}</div></div>
+      <div style="text-align:right"><div style="font-weight:700;font-size:13px">${(p.valor||0).toLocaleString()} MT</div><span class="badge ${p.estado||'pendente'}">${p.estado||'pendente'}</span></div>
+    </div>`).join('')||`<p style="text-align:center;color:var(--gray);font-size:13px;padding:16px">Nenhum pagamento.<br><a href="sigar_pagamentos_firebase.html" target="_blank" style="color:var(--blue);font-weight:700">Pagar agora →</a></p>`;
+}
+
+function buildComunicados(coms){
+  document.getElementById('ini-coms').innerHTML=coms.slice(0,3).map(c=>`
+    <div style="padding:8px 0;border-bottom:1px solid var(--lgray)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <strong style="font-size:12px;color:var(--blue)">${c.titulo||'—'}</strong>
+        <span style="font-size:10px;color:var(--gray)">${c.data||'—'}</span>
+      </div>
+      <p style="font-size:12px;color:var(--dark)">${c.mensagem||''}</p>
+    </div>`).join('')||'<p style="text-align:center;color:var(--gray);font-size:13px;padding:16px">Nenhum comunicado.</p>';
+}
+
+function buildPagamentos(){
+  const year=new Date().getFullYear();
+  document.getElementById('payYear').textContent=year;
+  document.getElementById('monthGrid').innerHTML=MONTHS.map(m=>{
+    const p=allPays.find(x=>x.mes===m&&x.ano===String(year));
+    const cls=!p?'unpaid':p.estado==='aprovado'?'paid':p.estado==='pendente'?'pending':'unpaid';
+    return `<div class="month-item ${cls}"><div>${m.substring(0,3)}</div><div style="font-size:14px;margin-top:3px">${!p?'—':p.estado==='aprovado'?'✅':p.estado==='pendente'?'⏳':'❌'}</div></div>`;
+  }).join('');
+  const total=allPays.filter(p=>p.estado==='aprovado').reduce((s,p)=>s+(p.valor||0),0);
+  document.getElementById('payTotal').textContent='Total pago: '+total.toLocaleString()+' MT';
+  document.getElementById('payHistory').innerHTML=allPays.length
+    ?allPays.map(p=>`
+      <div class="pay-item">
+        <div><div style="font-weight:700;color:var(--blue);font-size:13px">${p.mes||'—'} ${p.ano||''}</div><div style="font-size:10px;color:var(--gray)">${p.data||'—'} · ${(p.metodo||'—').split(' ')[0]}</div><div style="font-size:10px;color:var(--gray)">Ref: ${p.ref||'—'}</div></div>
+        <div style="text-align:right"><div style="font-weight:700;font-size:13px">${(p.valor||0).toLocaleString()} MT</div><span class="badge ${p.estado||'pendente'}">${p.estado||'pendente'}</span>${p.estado==='aprovado'?`<div style="margin-top:4px"><button onclick="verRecibo('${p.id}')" style="background:none;border:1px solid var(--lgray);border-radius:5px;padding:2px 7px;font-size:10px;cursor:pointer;color:var(--blue)">🧾 Recibo</button></div>`:''}
+        </div>
+      </div>`).join('')
+    :'<p style="text-align:center;color:var(--gray);font-size:13px;padding:20px">Nenhum pagamento registado ainda.</p>';
+}
+
+function verRecibo(id){
+  const p=allPays.find(x=>x.id===id);if(!p)return;
+  document.getElementById('mRecBody').innerHTML=`
+    <div class="rec"><div class="rh"><h4>CFTPM MOZTECHWAVE, E.I.</h4><p>Nacala-Porto · NUIT: 402029013 · Tel: 864 826 647</p></div><div class="rg"></div>
+    <div class="rb">
+      <div style="text-align:center;margin-bottom:11px"><div style="font-size:9px;color:var(--gray);font-weight:600;letter-spacing:2px">RECIBO DE MENSALIDADE</div>
+      <div style="font-size:13px;font-weight:700;color:var(--blue);letter-spacing:2px;background:var(--off);padding:5px 10px;border-radius:5px;display:inline-block;border:1px dashed var(--gold);margin:4px 0">${p.ref||'—'}</div>
+      <div style="font-size:9px;color:var(--gray)">${p.data||'—'}</div></div>
+      <div class="rrow"><span class="rl">Nome</span><span class="rv">${p.studentName||'—'}</span></div>
+      <div class="rrow"><span class="rl">Nº Aluno</span><span class="rv">${p.numAluno||'—'}</span></div>
+      <div class="rrow"><span class="rl">Curso</span><span class="rv">${p.curso||'—'}</span></div>
+      <div class="rrow"><span class="rl">Referente a</span><span class="rv">${p.mes||'—'} ${p.ano||''}</span></div>
+      <div class="rrow"><span class="rl">Método</span><span class="rv">${p.metodo||'—'}</span></div>
+      <div class="rrow"><span class="rl">Nº Conf.</span><span class="rv">${p.transNum||'—'}</span></div>
+      <div class="rrow"><span class="rl">Estado</span><span class="rv"><span class="badge ${p.estado||'pendente'}">${p.estado==='aprovado'?'✅ Aprovado':'⏳ Pendente'}</span></span></div>
+      <div id="recQR" style="display:flex;justify-content:center;margin:8px 0"></div>
+      <div class="rtot"><span class="tl">TOTAL</span><span class="ta">${(p.valor||0).toLocaleString()} MT</span></div>
+    </div><div class="rf"><p>✦ CFTPM Moztechwave · SIGAR Firebase ✦</p></div></div>`;
+  openM('mRecibo');
+  setTimeout(()=>{const qr=document.getElementById('recQR');if(qr)new QRCode(qr,{text:`SIGAR|${p.ref}|${p.studentName}|${p.mes} ${p.ano}|${p.valor}MT|${p.estado}`,width:70,height:70,colorDark:'#1B3A6B',colorLight:'#fff'});},200);
+}
+
+function printRec(){
+  const el=document.getElementById('mRecBody');
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Recibo</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Inter,Arial,sans-serif;background:#f0f0f0;display:flex;justify-content:center;padding:20px}.rec{width:340px;background:white;border-radius:10px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15)}.rh{background:#1B3A6B;padding:13px;text-align:center}.rh h4{font-family:Georgia,serif;color:#C9A02A;font-size:12px;margin-bottom:2px}.rh p{color:rgba(255,255,255,.6);font-size:9px}.rg{height:3px;background:#C9A02A}.rb{padding:13px}.rrow{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #eee;font-size:11px}.rl{color:#6B7280}.rv{font-weight:600;color:#1A1A1A}.rtot{background:#1B3A6B;padding:10px 13px;display:flex;justify-content:space-between;align-items:center}.tl{color:rgba(255,255,255,.7);font-size:10px}.ta{color:#C9A02A;font-size:15px;font-weight:700}.rf{padding:7px;text-align:center;background:#f9f9f9;font-size:9px;color:#999}@media print{body{background:white;padding:0}}</style></head><body>${el.innerHTML}<script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+function buildNotas(a){
+  const n=a.notas||{};
+  const media=n.t1&&n.t2&&n.exame?((+n.t1+ +n.t2+ +n.exame)/3).toFixed(1):null;
+  const pass=media&&+media>=10;
+  document.getElementById('ini-notas').innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <div class="grade-circle ${media?(pass?'pass':'fail'):'empty'}" style="width:52px;height:52px;font-size:18px">${media||'—'}</div>
+      <div><div style="font-size:14px;font-weight:700;color:${media?(pass?'var(--green)':'var(--red)'):'var(--gray)'}">${media?(pass?'APROVADO(A)':'REPROVADO(A)'):'Sem notas ainda'}</div><div style="font-size:11px;color:var(--gray)">Média final</div></div>
+    </div>
+    ${[['Teste 1',n.t1],['Teste 2',n.t2],['Exame Final',n.exame]].map(([l,v])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--lgray);font-size:12px"><span style="color:var(--gray)">${l}</span><strong style="color:${v?(+v>=10?'var(--green)':'var(--red)'):'var(--gray)'}">${v||'—'}${v?' v.':''}</strong></div>`).join('')}`;
+  if(!n.t1&&!n.t2&&!n.exame){document.getElementById('notasContent').innerHTML='<div class="alert info">📋 Ainda não há notas lançadas. Aguarde o Professor.</div>';return;}
+  document.getElementById('notasContent').innerHTML=`
+    <div style="text-align:center;margin-bottom:18px">
+      <div class="grade-circle ${pass?'pass':'fail'}" style="width:80px;height:80px;font-size:24px;margin:0 auto 10px">${media||'—'}</div>
+      <div style="font-size:17px;font-weight:700;color:${pass?'var(--green)':'var(--red)'}">${pass?'APROVADO(A)':'REPROVADO(A)'}</div>
+      <div style="font-size:12px;color:var(--gray);margin-top:3px">Nota mínima: 10 valores · Escala: 0–20</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      ${[['📝 Teste 1',n.t1],['📝 Teste 2',n.t2],['📄 Exame',n.exame]].map(([l,v])=>`<div style="background:var(--off);border-radius:9px;padding:14px;text-align:center;border:1.5px solid var(--lgray)"><div style="font-size:10px;color:var(--gray);margin-bottom:5px">${l}</div><div style="font-size:20px;font-weight:800;color:${v?(+v>=10?'var(--green)':'var(--red)'):'var(--gray)'}">${v||'—'}</div>${v?'<div style="font-size:9px;color:var(--gray)">valores</div>':''}</div>`).join('')}
+    </div>
+    <div style="background:${pass?'#D1FAE5':'#FEE2E2'};border-radius:9px;padding:13px;text-align:center;border:1.5px solid ${pass?'#6EE7B7':'#FCA5A5'}">
+      <div style="font-size:12px;color:${pass?'#065F46':'#991B1B'}">${pass?'🎓 Aprovado(a)! O certificado será emitido após validação do Director.':'⚠️ Tem direito a recurso. Contacte a secretaria: 864 826 647'}</div>
+    </div>`;
+}
+
+function buildPresencas(){
+  const faltas=allFreqs.filter(f=>!f.presente).length;
+  const total=allFreqs.length;
+  const assid=total>0?Math.round(((total-faltas)/total)*100):100;
+  const cls=assid<75?'danger':assid<90?'warn':'';
+  document.getElementById('presResumo').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+      ${[['Total',total,'var(--blue)'],['Presenças',total-faltas,'var(--green)'],['Faltas',faltas,'var(--red)']].map(([l,n,c])=>`<div style="background:var(--off);border-radius:8px;padding:10px;text-align:center;border:1.5px solid var(--lgray)"><div style="font-size:18px;font-weight:800;color:${c}">${n}</div><div style="font-size:10px;color:var(--gray)">${l}</div></div>`).join('')}
+    </div>
+    <div style="font-size:12px;margin-bottom:4px;font-weight:600;color:${assid<75?'var(--red)':assid<90?'var(--orange)':'var(--green)'}">Assiduidade: ${assid}% ${assid<75?'⚠️ Abaixo do mínimo!':assid<90?'⚠️ Atenção':'✅ Boa'}</div>
+    <div class="prog"><div class="prog-bar ${cls}" style="width:${assid}%"></div></div>
+    ${assid<75?'<div class="alert error" style="margin-top:10px">⚠️ Risco de perder direito à avaliação!</div>':''}`;
+  const sorted=[...allFreqs].sort((a,b)=>b.data.localeCompare(a.data));
+  document.getElementById('presTbody').innerHTML=sorted.length
+    ?sorted.map((f,i)=>`<tr style="background:${i%2===0?'var(--off)':'white'}"><td style="padding:7px 10px;border-bottom:1px solid var(--lgray);font-size:12px">${f.data||'—'}</td><td style="padding:7px 10px;border-bottom:1px solid var(--lgray);text-align:center"><span class="badge ${f.presente?'presente':'falta'}">${f.presente?'✅ Presente':'❌ Falta'}</span></td><td style="padding:7px 10px;border-bottom:1px solid var(--lgray);font-size:11px;color:var(--gray)">${f.obs||'—'}</td></tr>`).join('')
+    :'<tr><td colspan="3" style="text-align:center;color:var(--gray);padding:20px;font-size:13px">Nenhum registo ainda.</td></tr>';
+}
+
+async function buildEstagio(a){
+  try{
+    const ests=await window.ADB.getEstagios(a.id);
+    document.getElementById('estagioContent').innerHTML=ests.length
+      ?ests.map(e=>`<div style="background:var(--off);border-radius:9px;padding:14px;border:1.5px solid var(--lgray);margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:var(--blue)">🏢 ${e.local||'—'}</div><span class="badge ${e.estado==='Concluído'?'aprovado':'pendente'}">${e.estado||'—'}</span></div>${[['Supervisor',e.supervisor||'—'],['Início',e.inicio||'—'],['Fim',e.fim||'Em curso'],['Avaliação',e.avaliacao||'—']].map(([l,v])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--lgray);font-size:12px"><span style="color:var(--gray)">${l}</span><strong>${v}</strong></div>`).join('')}</div>`).join('')
+      :'<div class="alert info">ℹ️ Ainda não tem estágio atribuído. Contacte a secretaria.</div>';
+  }catch(e){document.getElementById('estagioContent').innerHTML='<div class="alert info">ℹ️ Ainda não tem estágio atribuído.</div>';}
+}
+
+function buildCertificado(){
+  const a=currentAluno;const n=a.notas||{};
+  const media=n.t1&&n.t2&&n.exame?((+n.t1+ +n.t2+ +n.exame)/3).toFixed(1):null;
+  const pass=media&&+media>=10;
+  const aprov=allPays.filter(p=>p.estado==='aprovado');
+  if(!pass){
+    document.getElementById('certContent').innerHTML=`<div class="alert warn">⏳ Certificado ainda não disponível.</div><div style="display:grid;gap:8px">${[['📋 Notas lançadas',!!(n.t1&&n.t2&&n.exame)],['✅ Aprovado(a)',!!pass],['💳 Pelo menos 1 mês pago',aprov.length>0]].map(([l,ok])=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--off);border-radius:8px;border:1px solid var(--lgray)"><span style="font-size:16px">${ok?'✅':'⏳'}</span><span style="font-size:12px;color:${ok?'var(--green)':'var(--gray)'}">${l}</span></div>`).join('')}</div>`;
+    return;
+  }
+  document.getElementById('certContent').innerHTML=`
+    <div style="background:linear-gradient(135deg,var(--blue),var(--blue2));border-radius:10px;padding:20px;text-align:center;margin-bottom:14px">
+      <div style="font-family:'Cinzel',serif;color:var(--gold);font-size:14px;margin-bottom:6px">🏆 CERTIFICADO DE COMPETÊNCIA</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.7);margin-bottom:10px">CFTPM Moztechwave, E.I. · NUIT: 402029013</div>
+      <div style="font-size:18px;font-weight:700;color:white;margin-bottom:6px">${a.nome.toUpperCase()}</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.8);margin-bottom:8px">${a.curso}</div>
+      <div style="background:rgba(255,255,255,.1);border-radius:7px;padding:7px 14px;display:inline-block"><span style="color:rgba(255,255,255,.7);font-size:11px">Nota Final: </span><strong style="color:var(--gold);font-size:15px">${media} valores</strong></div>
+    </div>
+    <div style="display:flex;justify-content:center;margin-bottom:14px" id="certQR"></div>
+    <div class="alert success">🎓 Dirija-se à secretaria da Moztechwave para levantar o certificado.</div>
+    <button class="btn btn-gold" onclick="imprimirCert()">🖨️ Imprimir Prévia</button>`;
+  setTimeout(()=>{const qr=document.getElementById('certQR');if(qr)new QRCode(qr,{text:`SIGAR MTW|${a.numAluno||a.id}|${a.nome}|${a.curso}|MEDIA:${media}|APROVADO|NUIT:402029013`,width:100,height:100,colorDark:'#1B3A6B',colorLight:'#fff'});},300);
+}
+
+function imprimirCert(){
+  const a=currentAluno;const n=a.notas||{};const media=((+n.t1+ +n.t2+ +n.exame)/3).toFixed(1);
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Certificado — ${a.nome}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Georgia,Arial,sans-serif;padding:30px;max-width:650px;margin:0 auto}.hd{background:#1B3A6B;padding:18px;text-align:center;border-radius:8px 8px 0 0}.hd h1{color:#C9A02A;font-size:14px;margin-bottom:3px}.hd p{color:rgba(255,255,255,.7);font-size:9px}.gl{height:4px;background:#C9A02A}.bd{border:2px solid #1B3A6B;padding:28px;text-align:center}.nm{font-size:26px;font-weight:700;color:#1B3A6B;border-bottom:2px solid #C9A02A;padding-bottom:8px;margin:14px 0}.cr{font-size:15px;font-weight:700;color:#C9A02A;margin:10px 0}.sgs{display:flex;justify-content:space-around;margin-top:36px}.sg{width:160px;border-top:1px solid #1B3A6B;padding-top:6px;font-size:10px;color:#555;text-align:center}@media print{body{padding:15px}}</style></head>
+  <body><div class="hd"><h1>CFTPM MOZTECHWAVE, E.I.</h1><p>Nacala-Porto · NUIT: 402029013 · PRÉVIA NÃO OFICIAL</p></div><div class="gl"></div><div class="bd"><p style="font-size:12px;color:#888">Certifica-se que</p><div class="nm">${a.nome.toUpperCase()}</div><p style="font-size:13px;color:#555">concluiu com aproveitamento o curso de</p><div class="cr">${a.curso}</div><p style="font-size:13px;color:#555;margin:8px 0">Nota Final: <strong>${media} valores</strong> · ANEP/COREP/SNQP</p><p style="font-size:12px;color:#555">Nº Aluno: ${a.numAluno||a.id} · B.I.: ${a.bi||'—'}</p><div class="sgs"><div class="sg">Jafim Paulo Pereira Rupia<br>Director Geral</div><div class="sg">Formador Responsável</div></div><p style="margin-top:18px;font-size:9px;color:#aaa">⚠️ PRÉVIA — Levante o original na secretaria</p></div><script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+function buildPerfil(a){
+  document.getElementById('perfilContent').innerHTML=`
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px">
+      <div style="width:80px;height:96px;border-radius:8px;border:3px solid var(--gold);overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--blue);color:var(--gold);font-size:30px;font-weight:700;flex-shrink:0">${a.foto?`<img src="${a.foto}" style="width:100%;height:100%;object-fit:cover">`:a.nome[0].toUpperCase()}</div>
+      <div style="flex:1"><div style="font-size:16px;font-weight:700;color:var(--blue);margin-bottom:3px">${a.nome}</div><div style="font-size:11px;color:var(--gray);margin-bottom:10px">${a.numAluno||a.id}</div><span class="badge ${a.estado||'activo'}">${a.estado||'activo'}</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+      ${[['BI / NUIT',a.bi||'—'],['Nascimento',a.nascimento||'—'],['Sexo',a.sexo||'—'],['Telefone',a.telefone||'—'],['Email',a.email||'—'],['Naturalidade',a.naturalidade||'—'],['Curso',a.curso],['Horário',a.horario||'—'],['Início',a.inicio||'—'],['Duração',a.duracao||'—'],['Mensalidade',(a.valor||0).toLocaleString()+' MT'],['Estado',a.estado||'activo']].map(([l,v])=>`<div style="background:var(--off);border-radius:7px;padding:9px 11px;border:1px solid var(--lgray)"><div style="font-size:9px;font-weight:700;color:var(--blue);margin-bottom:2px">${l}</div><div style="font-size:12px;color:var(--dark)">${v}</div></div>`).join('')}
+    </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--lgray)">
+      <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:8px">🎒 Materiais</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">${[['Uniforme',a.uniforme],['Crachá',a.cracha],['Manual',a.manual],['Kit',a.kit]].map(([l,v])=>`<span style="padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;background:${v?'#D1FAE5':'#FEE2E2'};color:${v?'#065F46':'#991B1B'}">${l} ${v?'✓':'✗'}</span>`).join('')}</div>
+    </div>`;
+  buildCartao(a);
+}
+
+function buildCartao(a){
+  document.getElementById('cartaoPreview').innerHTML=`
+    <div id="cartaoEl" style="width:300px;border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.2)">
+      <div style="background:linear-gradient(135deg,#1B3A6B 0%,#2A5FA8 100%)">
+        <div style="padding:12px 14px;display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:7px;color:rgba(255,255,255,.7);font-weight:600;letter-spacing:1px;text-transform:uppercase;line-height:1.5">Centro de Formação Técnico Profissional<br><strong style="color:#C9A02A;font-size:10px">MOZTECHWAVE, E.I.</strong></div>
+          <span style="font-size:20px">🎓</span>
+        </div>
+        <div style="height:2px;background:linear-gradient(90deg,#C9A02A,transparent)"></div>
+        <div style="padding:10px 14px;display:flex;gap:10px;align-items:flex-start">
+          <div style="width:54px;height:65px;border-radius:5px;border:2px solid #C9A02A;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#C9A02A;overflow:hidden;flex-shrink:0">${a.foto?`<img src="${a.foto}" style="width:100%;height:100%;object-fit:cover">`:a.nome[0].toUpperCase()}</div>
+          <div style="flex:1">
+            <div style="font-size:11px;font-weight:700;color:white;line-height:1.3;margin-bottom:4px">${a.nome.toUpperCase()}</div>
+            <div style="font-size:8px;color:rgba(255,255,255,.65);margin-bottom:2px">Nº: ${a.numAluno||a.id}</div>
+            <div style="font-size:8px;color:rgba(255,255,255,.65);margin-bottom:2px">Curso: ${a.curso}</div>
+            <div style="font-size:8px;color:rgba(255,255,255,.65)">NUIT: 402029013</div>
+          </div>
+        </div>
+        <div style="padding:8px 14px;display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,.2)">
+          <div style="font-size:7px;color:rgba(255,255,255,.6)">Válido até<br><strong style="color:white;font-size:9px">Dezembro ${new Date().getFullYear()}</strong></div>
+          <div style="background:white;padding:3px;border-radius:3px" id="cardQR"></div>
+        </div>
+      </div>
+    </div>`;
+  setTimeout(()=>{const qr=document.getElementById('cardQR');if(qr)new QRCode(qr,{text:`SIGAR MTW|${a.numAluno||a.id}|${a.nome}|${a.curso}|VALIDO`,width:50,height:50,colorDark:'#1B3A6B',colorLight:'#fff'});},300);
+}
+
+function imprimirCartao(){
+  const el=document.getElementById('cartaoEl');if(!el)return;
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Cartão</title><style>body{font-family:Inter,Arial,sans-serif;background:#e0e0e0;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px}@media print{body{background:white;padding:0}}</style></head><body>${el.outerHTML}<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><script>window.onload=()=>setTimeout(()=>window.print(),600)<\/script></body></html>`);
+  w.document.close();
+}
+
+function switchTab(id){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b=>{if(b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'"+id+"'"))b.classList.add('active');});
+  if(id==='certificado')buildCertificado();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function openM(id){document.getElementById(id).classList.add('open');}
+function closeM(id){document.getElementById(id).classList.remove('open');}
+function showToast(msg,err=false){const t=document.getElementById('toast');t.textContent=msg;t.style.borderLeftColor=err?'var(--red)':'var(--gold)';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+</script>
+</body>
+</html>
