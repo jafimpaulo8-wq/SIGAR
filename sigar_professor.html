@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGAR — Painel do Professor | Moztechwave</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Cinzel:wght@700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#1B3A6B;--blue2:#1E4D8C;--gold:#C9A02A;--gold2:#E8B830;
+  --dark:#0D1E3A;--white:#fff;--off:#F4F6FB;--gray:#6B7280;
+  --lgray:#E5E9F0;--green:#16A34A;--red:#DC2626;--orange:#D97706;
+  --radius:10px;--shadow:0 4px 24px rgba(27,58,107,0.12);
+}
+body.dark{--white:#1A2332;--off:#111827;--lgray:#374151;--dark:#F9FAFB;--gray:#9CA3AF}
+body.dark .card{background:#1F2937;border-color:#374151}
+body.dark .fg input,body.dark .fg select,body.dark .fg textarea{background:#1F2937;color:#F9FAFB;border-color:#374151}
+body{font-family:'Inter',sans-serif;background:var(--off);color:var(--dark)}
+
+.layout{display:flex;min-height:100vh}
+.sidebar{width:240px;background:var(--blue);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto;transition:.3s}
+.sidebar.collapsed{width:60px}
+.sidebar-brand{padding:16px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:10px;min-height:64px}
+.sidebar-brand .logo{font-size:24px;flex-shrink:0}
+.sidebar-brand .name{font-family:'Cinzel',serif;color:white;font-size:11px;line-height:1.3;white-space:nowrap;overflow:hidden}
+.sidebar-brand .name span{display:block;color:var(--gold);font-size:9px;font-family:'Inter',sans-serif;font-weight:600;letter-spacing:2px}
+.sidebar.collapsed .sidebar-brand .name{display:none}
+.nav-section{padding:8px 16px 3px;font-size:9px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,.35);text-transform:uppercase;white-space:nowrap;overflow:hidden}
+.sidebar.collapsed .nav-section{display:none}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;color:rgba(255,255,255,.7);font-size:13px;font-weight:500;cursor:pointer;transition:.2s;border-left:3px solid transparent;white-space:nowrap}
+.nav-item:hover{background:rgba(255,255,255,.08);color:white}
+.nav-item.active{background:rgba(201,160,42,.15);color:var(--gold);border-left-color:var(--gold)}
+.nav-item .ni{font-size:16px;width:22px;text-align:center;flex-shrink:0}
+.nav-item .nl{overflow:hidden}
+.sidebar.collapsed .nav-item .nl{display:none}
+.sidebar-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,.1);margin-top:auto}
+.sidebar-footer p{font-size:9px;color:rgba(255,255,255,.35);white-space:nowrap;overflow:hidden}
+.sidebar.collapsed .sidebar-footer p{display:none}
+
+.main{margin-left:240px;flex:1;display:flex;flex-direction:column;transition:.3s}
+.main.expanded{margin-left:60px}
+.topbar{background:var(--white);padding:0 20px;height:60px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--lgray);box-shadow:0 1px 4px rgba(0,0,0,.06);position:sticky;top:0;z-index:50;gap:12px}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.toggle-btn{background:none;border:none;font-size:18px;cursor:pointer;color:var(--blue);padding:6px;border-radius:6px}
+.page-title{font-size:15px;font-weight:700;color:var(--blue)}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.topbar-badge{background:rgba(201,160,42,.15);color:var(--gold);border:1px solid rgba(201,160,42,.3);padding:4px 12px;border-radius:99px;font-size:11px;font-weight:700}
+.dark-toggle{background:none;border:1.5px solid var(--lgray);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:600;color:var(--gray)}
+.clock{font-size:12px;color:var(--gray)}
+
+.content{padding:20px;flex:1}
+.page{display:none}
+.page.active{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:20px}
+.stat-card{background:var(--white);border-radius:var(--radius);padding:16px;border:1.5px solid var(--lgray);display:flex;align-items:center;gap:12px}
+.stat-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.ic-blue{background:rgba(27,58,107,.1)}.ic-gold{background:rgba(201,160,42,.1)}
+.ic-green{background:rgba(22,163,74,.1)}.ic-red{background:rgba(220,38,38,.1)}
+.stat-val{font-size:22px;font-weight:800;color:var(--blue);line-height:1}
+.stat-lbl{font-size:11px;color:var(--gray);margin-top:2px}
+
+.card{background:var(--white);border-radius:var(--radius);border:1.5px solid var(--lgray);margin-bottom:18px;overflow:hidden}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--lgray);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.card-header h3{font-size:14px;font-weight:700;color:var(--blue);display:flex;align-items:center;gap:6px}
+.card-body{padding:18px}
+
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--blue);color:var(--gold);padding:9px 10px;text-align:left;font-weight:700;font-size:11px;white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--lgray);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:nth-child(even) td{background:rgba(244,246,251,.5)}
+tr:hover td{background:rgba(27,58,107,.03)}
+
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700}
+.badge.presente{background:#D1FAE5;color:#065F46}
+.badge.falta{background:#FEE2E2;color:#991B1B}
+.badge.justificada{background:#FEF3C7;color:#92400E}
+.badge.aprovado{background:#D1FAE5;color:#065F46}
+.badge.reprovado{background:#FEE2E2;color:#991B1B}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:.2s;font-family:'Inter',sans-serif}
+.btn-primary{background:var(--gold);color:var(--blue)}
+.btn-primary:hover{background:var(--gold2)}
+.btn-blue{background:var(--blue);color:white}
+.btn-blue:hover{background:var(--blue2)}
+.btn-green{background:var(--green);color:white}
+.btn-red{background:var(--red);color:white}
+.btn-outline{background:transparent;border:1.5px solid var(--lgray);color:var(--gray)}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue)}
+.btn-sm{padding:4px 9px;font-size:11px}
+.btn-group{display:flex;gap:6px;flex-wrap:wrap}
+
+.fg{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.fg label{font-size:11px;font-weight:600;color:var(--blue)}
+.fg input,.fg select,.fg textarea{border:1.5px solid var(--lgray);border-radius:7px;padding:8px 11px;font-size:13px;font-family:'Inter',sans-serif;outline:none;transition:.2s;background:white;color:var(--dark)}
+.fg input:focus,.fg select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(27,58,107,.08)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.form-grid{grid-template-columns:1fr}}
+
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+
+.grade-box{display:inline-flex;align-items:center;justify-content:center;width:38px;height:26px;border-radius:5px;font-size:12px;font-weight:700}
+.grade-box.pass{background:#D1FAE5;color:#065F46}
+.grade-box.fail{background:#FEE2E2;color:#991B1B}
+.grade-box.empty{background:var(--lgray);color:var(--gray)}
+
+/* ASSINATURA */
+.signature-area{border:2px dashed var(--lgray);border-radius:10px;padding:20px;text-align:center;margin-bottom:16px}
+.sig-line{width:200px;height:2px;background:var(--blue);margin:16px auto 4px}
+.sig-name{font-size:11px;color:var(--gray)}
+
+/* LIVRO DE TURMA */
+.livro-header{background:linear-gradient(135deg,var(--blue),var(--blue2));padding:20px;text-align:center;border-radius:10px;margin-bottom:16px}
+.livro-header h2{font-family:'Cinzel',serif;color:var(--gold);font-size:18px;margin-bottom:4px}
+.livro-header p{color:rgba(255,255,255,.7);font-size:12px}
+
+/* PRESENÇA TOGGLE */
+.pres-btn{width:80px;padding:5px;border-radius:6px;font-size:11px;font-weight:700;border:none;cursor:pointer;transition:.2s}
+.pres-btn.presente{background:#D1FAE5;color:#065F46}
+.pres-btn.falta{background:#FEE2E2;color:#991B1B}
+.pres-btn.justificada{background:#FEF3C7;color:#92400E}
+
+/* PROGRESS */
+.progress{height:5px;background:var(--lgray);border-radius:99px;overflow:hidden;margin-top:4px}
+.progress-bar{height:100%;border-radius:99px;background:var(--green)}
+.progress-bar.warn{background:var(--orange)}
+.progress-bar.danger{background:var(--red)}
+
+/* MODAL */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-ov.open{display:flex;animation:fadeIn .2s}
+.modal{background:white;border-radius:14px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+body.dark .modal{background:#1F2937;color:#F9FAFB}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--lgray);display:flex;align-items:center;justify-content:space-between}
+.modal-header h3{font-size:15px;font-weight:700;color:var(--blue)}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray)}
+.modal-body{padding:20px}
+.modal-footer{padding:12px 20px;border-top:1px solid var(--lgray);display:flex;justify-content:flex-end;gap:8px}
+
+.toast{position:fixed;bottom:20px;right:20px;background:var(--blue);color:white;padding:12px 16px;border-radius:8px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.2);transform:translateY(60px);opacity:0;transition:.3s;z-index:999;border-left:4px solid var(--gold);max-width:300px}
+.toast.show{transform:translateY(0);opacity:1}
+
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.mobile-open{transform:translateX(0)}
+  .main{margin-left:0!important}
+  .clock{display:none}
+}
+</style>
+</head>
+<body>
+<!-- PROFESSOR LOGIN -->
+<div id="profLoginWrap" style="position:fixed;inset:0;background:linear-gradient(135deg,#0D1E3A 0%,#1B3A6B 60%,#2A5FA8 100%);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px">
+  <div style="background:white;border-radius:20px;padding:36px 28px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="margin-bottom:10px"><img src="data:image/jpeg;base64,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" alt="Moztechwave" style="width:72px;height:72px;border-radius:50%;object-fit:contain;border:3px solid #C9A02A;padding:4px;background:white"></div>
+      <div style="font-family:'Cinzel',serif;color:#1B3A6B;font-size:18px;margin-bottom:4px">Painel do Professor</div>
+      <div style="font-size:12px;color:#6B7280">SIGAR — CFTPM Moztechwave</div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:#1B3A6B;margin-bottom:8px">Seleccione o seu perfil:</div>
+      <div style="display:grid;gap:10px">
+        <div onclick="loginProf('Samuel Jorge','Formador — Educação de Infância','👨‍🏫')" style="border:2px solid #E5E9F0;border-radius:10px;padding:13px 15px;cursor:pointer;transition:.2s;display:flex;align-items:center;gap:12px" onmouseover="this.style.borderColor='#1B3A6B'" onmouseout="this.style.borderColor='#E5E9F0'">
+          <span style="font-size:28px">👨‍🏫</span>
+          <div><div style="font-weight:700;color:#1B3A6B;font-size:14px">Samuel Jorge</div><div style="font-size:11px;color:#6B7280">Formador — Educação de Infância</div></div>
+        </div>
+        <div onclick="loginProf('Duque Pedro Mássicape','Formador — Máquinas Pesadas / Secretariado','👷')" style="border:2px solid #E5E9F0;border-radius:10px;padding:13px 15px;cursor:pointer;transition:.2s;display:flex;align-items:center;gap:12px" onmouseover="this.style.borderColor='#1B3A6B'" onmouseout="this.style.borderColor='#E5E9F0'">
+          <span style="font-size:28px">👷</span>
+          <div><div style="font-weight:700;color:#1B3A6B;font-size:14px">Duque Pedro Mássicape</div><div style="font-size:11px;color:#6B7280">Formador — Máquinas Pesadas / Secretariado</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="border-top:1px solid #E5E9F0;margin-top:16px;padding-top:14px">
+      <div style="font-size:11px;color:#6B7280;margin-bottom:8px;font-weight:600">Ou acesso do Director:</div>
+      <div onclick="loginProf('Jafim Paulo Pereira Rupia','Director Geral — Acesso Total','👑')" style="border:2px solid rgba(201,160,42,.3);border-radius:10px;padding:11px 15px;cursor:pointer;background:rgba(201,160,42,.05);display:flex;align-items:center;gap:12px">
+        <span style="font-size:24px">👑</span>
+        <div><div style="font-weight:700;color:#1B3A6B;font-size:13px">Jafim Paulo Pereira Rupia</div><div style="font-size:11px;color:#6B7280">Director Geral — Acesso Total</div></div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:14px;font-size:11px;color:#6B7280">🔒 Cada professor só vê os seus próprios dados</div>
+  </div>
+</div>
+
+<div class="layout">
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo">👨‍🏫</div>
+    <div class="name">SIGAR — Professor<span>MOZTECHWAVE</span></div>
+  </div>
+  <nav style="flex:1;padding:12px 0">
+    <div class="nav-section">Principal</div>
+    <div class="nav-item active" onclick="showPage('dashboard')"><span class="ni">📊</span><span class="nl">Dashboard</span></div>
+    <div class="nav-section">Turma</div>
+    <div class="nav-item" onclick="showPage('minha-turma')"><span class="ni">🏫</span><span class="nl">Minha Turma</span></div>
+    <div class="nav-item" onclick="showPage('livro-turma')"><span class="ni">📒</span><span class="nl">Livro de Turma</span></div>
+    <div class="nav-section">Académico</div>
+    <div class="nav-item" onclick="showPage('presencas')"><span class="ni">✅</span><span class="nl">Marcar Presenças</span></div>
+    <div class="nav-item" onclick="showPage('notas')"><span class="ni">📋</span><span class="nl">Lançar Notas</span></div>
+    <div class="nav-item" onclick="showPage('pautas')"><span class="ni">📄</span><span class="nl">Pautas</span></div>
+    <div class="nav-section">Comunicação</div>
+    <div class="nav-item" onclick="showPage('comunicados')"><span class="ni">📢</span><span class="nl">Comunicados</span></div>
+    <div class="nav-section">Assinatura</div>
+    <div class="nav-item" onclick="showPage('assinatura')"><span class="ni">✍️</span><span class="nl">Assinatura Diária</span></div>
+  </nav>
+  <div class="sidebar-footer">
+    <p>SIGAR © 2026 — CFTPM Moztechwave</p>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main" id="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+      <div class="page-title" id="pageTitle">📊 Dashboard</div>
+    </div>
+    <div class="topbar-right">
+      <button class="dark-toggle" onclick="toggleDark()">🌙</button>
+      <span class="topbar-badge" id="profBadge" style="display:none">👨‍🏫 —</span>
+      <button onclick="doLogoutProf()" id="logoutBtn" style="display:none;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.8);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif">Sair</button>
+      <span class="clock" id="clock"></span>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div class="page active" id="page-dashboard">
+      <div style="background:linear-gradient(135deg,var(--blue),var(--blue2));border-radius:12px;padding:20px;margin-bottom:20px;color:white">
+        <div style="font-size:13px;color:rgba(255,255,255,.7);margin-bottom:4px">Bem-vindo ao SIGAR</div>
+        <div style="font-size:20px;font-weight:700;font-family:'Cinzel',serif;color:var(--gold)" id="dash-prof-name">Seleccione o seu perfil acima</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:4px">CFTPM Moztechwave · Nacala-Porto · <span id="dash-date"></span></div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon ic-blue">👨‍🎓</div><div><div class="stat-val" id="d-alunos">0</div><div class="stat-lbl">Alunos na Turma</div></div></div>
+        <div class="stat-card"><div class="stat-icon ic-green">✅</div><div><div class="stat-val" id="d-presentes">0</div><div class="stat-lbl">Presentes Hoje</div></div></div>
+        <div class="stat-card"><div class="stat-icon ic-red">❌</div><div><div class="stat-val" id="d-faltas">0</div><div class="stat-lbl">Faltas Hoje</div></div></div>
+        <div class="stat-card"><div class="stat-icon ic-gold">📋</div><div><div class="stat-val" id="d-avaliados">0</div><div class="stat-lbl">Com Notas</div></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="card">
+          <div class="card-header"><h3>📅 Hoje — <span id="d-today"></span></h3></div>
+          <div class="card-body" id="d-hoje"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>⚠️ Alunos com mais faltas</h3></div>
+          <div class="card-body" id="d-faltas-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MINHA TURMA ══ -->
+    <div class="page" id="page-minha-turma">
+      <div class="card">
+        <div class="card-header">
+          <h3>🏫 Minha Turma</h3>
+          <select id="turma-filter" onchange="renderMinhaTurma()" style="border:1.5px solid var(--lgray);border-radius:7px;padding:7px 10px;font-size:12px;outline:none">
+            <option value="">Todos os cursos</option>
+          </select>
+        </div>
+        <div class="card-body">
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Foto</th><th>Nome</th><th>Nº Aluno</th><th>Curso</th><th>Horário</th><th>Assiduidade</th><th>Situação</th></tr></thead>
+              <tbody id="turma-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ LIVRO DE TURMA ══ -->
+    <div class="page" id="page-livro-turma">
+      <div class="livro-header">
+        <h2>📒 Livro de Turma Digital</h2>
+        <p>CFTPM Moztechwave, E.I. · Nacala-Porto · <span id="livro-prof"></span></p>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>Seleccionar Turma / Curso</h3>
+          <select id="livro-curso" onchange="renderLivro()" style="border:1.5px solid var(--lgray);border-radius:7px;padding:7px 10px;font-size:12px;outline:none">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="card-body" id="livro-body">
+          <p style="text-align:center;color:var(--gray);font-size:13px;padding:20px">Seleccione um curso para ver o livro de turma.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MARCAR PRESENÇAS ══ -->
+    <div class="page" id="page-presencas">
+      <div class="card">
+        <div class="card-header">
+          <h3>✅ Marcar Presenças</h3>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="date" id="pres-data" style="border:1.5px solid var(--lgray);border-radius:7px;padding:7px 10px;font-size:12px;outline:none">
+            <select id="pres-curso" style="border:1.5px solid var(--lgray);border-radius:7px;padding:7px 10px;font-size:12px;outline:none" onchange="loadPresencas()">
+              <option value="">Todos os cursos</option>
+            </select>
+            <button class="btn btn-blue btn-sm" onclick="marcarTodosPresentes()">✅ Todos Presentes</button>
+            <button class="btn btn-primary btn-sm" onclick="salvarPresencas()">💾 Guardar</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <!-- Summary -->
+          <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap" id="pres-summary"></div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Foto</th><th>Nome</th><th>Curso</th><th>Presença</th><th>Tipo de Falta</th><th>Observação</th></tr></thead>
+              <tbody id="pres-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Histórico de presenças -->
+      <div class="card">
+        <div class="card-header"><h3>📅 Histórico de Presenças por Aluno</h3></div>
+        <div class="card-body">
+          <div class="fg" style="max-width:300px">
+            <label>Seleccionar Aluno</label>
+            <select id="hist-aluno" onchange="renderHistPresenca()">
+              <option value="">-- Seleccione --</option>
+            </select>
+          </div>
+          <div id="hist-pres-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ NOTAS ══ -->
+    <div class="page" id="page-notas">
+      <div class="card">
+        <div class="card-header">
+          <h3>📋 Lançamento de Notas</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="notas-curso" onchange="renderNotas()" style="border:1.5px solid var(--lgray);border-radius:7px;padding:7px 10px;font-size:12px;outline:none">
+              <option value="">Todos os cursos</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="openModal('modal-nota')">➕ Lançar Nota</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Aluno</th><th>Curso</th><th>Teste 1</th><th>Teste 2</th><th>Exame Final</th><th>Média</th><th>Resultado</th><th>Editar</th></tr></thead>
+              <tbody id="notas-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAUTAS (Leitura) ══ -->
+    <div class="page" id="page-pautas">
+      <div class="card">
+        <div class="card-header">
+          <h3>📄 Pautas — Apenas Leitura</h3>
+          <div style="display:flex;gap:8px">
+            <select id="pauta-curso-prof" onchange="renderPautaProf()" style="border:1.5px solid var(--lgray);border-radius:7px;padding:7px 10px;font-size:12px;outline:none">
+              <option value="">Todos os cursos</option>
+            </select>
+            <button class="btn btn-outline btn-sm" onclick="printPauta()">🖨️ Imprimir</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="background:#FEF3C7;border:1px solid var(--orange);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#92400E">
+            ⚠️ Esta pauta é apenas para consulta. Apenas o Director pode aprovar ou reprovar alunos.
+          </div>
+          <div id="pauta-prof-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ COMUNICADOS ══ -->
+    <div class="page" id="page-comunicados">
+      <div class="card">
+        <div class="card-header">
+          <h3>📢 Comunicados para Alunos</h3>
+          <button class="btn btn-primary btn-sm" onclick="openModal('modal-comunicado')">➕ Novo Comunicado</button>
+        </div>
+        <div class="card-body" id="com-body">
+          <p style="text-align:center;color:var(--gray);font-size:13px;padding:20px">Nenhum comunicado ainda.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ASSINATURA DIÁRIA ══ -->
+    <div class="page" id="page-assinatura">
+      <div class="card">
+        <div class="card-header"><h3>✍️ Assinatura Diária do Professor</h3></div>
+        <div class="card-body">
+          <div style="background:var(--off);border-radius:10px;padding:20px;margin-bottom:20px">
+            <div style="font-size:13px;color:var(--gray);margin-bottom:8px">Data de hoje:</div>
+            <div style="font-size:18px;font-weight:700;color:var(--blue)" id="sig-date"></div>
+          </div>
+          <div id="sig-list" style="margin-bottom:20px"></div>
+          <div class="signature-area">
+            <div style="font-size:12px;color:var(--gray);margin-bottom:16px">Assinatura do Professor</div>
+            <div class="sig-line"></div>
+            <div class="sig-name" id="sig-prof-name">Nome do Professor</div>
+          </div>
+          <button class="btn btn-blue" onclick="assinarDia()">✍️ Confirmar Assinatura de Hoje</button>
+          <div class="card" style="margin-top:20px">
+            <div class="card-header"><h3>📅 Histórico de Assinaturas</h3></div>
+            <div class="card-body" id="sig-history"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ══ MODAL: NOTA ══ -->
+<div class="modal-ov" id="modal-nota">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3>📋 Lançar / Editar Nota</h3>
+      <button class="modal-close" onclick="closeModal('modal-nota')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><label>Aluno *</label>
+        <select id="mn-aluno"><option value="">-- Seleccione --</option></select>
+      </div>
+      <div class="form-grid">
+        <div class="fg"><label>Teste 1 (0–20)</label><input type="number" id="mn-t1" min="0" max="20" placeholder="0"></div>
+        <div class="fg"><label>Teste 2 (0–20)</label><input type="number" id="mn-t2" min="0" max="20" placeholder="0"></div>
+        <div class="fg"><label>Exame Final (0–20)</label><input type="number" id="mn-ex" min="0" max="20" placeholder="0"></div>
+        <div class="fg"><label>Média (calculada)</label>
+          <input type="text" id="mn-media" readonly style="background:var(--off);font-weight:700;color:var(--blue)">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--gray)">⚠️ Aprovação (≥ 10 valores) ou Reprovação é decidida automaticamente pelo sistema.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-nota')">Cancelar</button>
+      <button class="btn btn-blue" onclick="salvarNota()">✅ Guardar Nota</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: COMUNICADO ══ -->
+<div class="modal-ov" id="modal-comunicado">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3>📢 Novo Comunicado</h3>
+      <button class="modal-close" onclick="closeModal('modal-comunicado')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><label>Título *</label><input type="text" id="mc-titulo" placeholder="Ex: Teste marcado para..."></div>
+      <div class="fg"><label>Mensagem *</label><textarea id="mc-msg" rows="4" placeholder="Escreva a mensagem..." style="resize:vertical"></textarea></div>
+      <div class="fg"><label>Curso / Turma</label>
+        <select id="mc-curso" style="border:1.5px solid var(--lgray);border-radius:7px;padding:8px 11px;font-size:13px;outline:none">
+          <option value="">Todos os alunos</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-comunicado')">Cancelar</button>
+      <button class="btn btn-blue" onclick="salvarComunicado()">📢 Publicar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════
+// DATA
+// ════════════════════════════════════════════════════════════════════════
+const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function getData(k){ try{return JSON.parse(localStorage.getItem('sigar_'+k)||'[]')}catch(e){return []} }
+function setData(k,v){ localStorage.setItem('sigar_'+k,JSON.stringify(v)) }
+function genId(){ return 'ID'+Date.now()+Math.floor(Math.random()*1000) }
+function today(){ return new Date().toLocaleDateString('pt-MZ',{day:'2-digit',month:'long',year:'numeric'}) }
+function todayISO(){ return new Date().toISOString().split('T')[0] }
+
+let currentProf = '';
+let comunicados = getData('prof_comunicados') || [];
+
+// ════════════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════════════════════════════
+const titles = {
+  dashboard:'📊 Dashboard','minha-turma':'🏫 Minha Turma','livro-turma':'📒 Livro de Turma',
+  presencas:'✅ Marcar Presenças',notas:'📋 Lançar Notas',pautas:'📄 Pautas',
+  comunicados:'📢 Comunicados',assinatura:'✍️ Assinatura Diária'
+};
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('pageTitle').textContent=titles[id]||id;
+  document.querySelectorAll('.nav-item').forEach(n=>{
+    if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+id+"'")) n.classList.add('active');
+  });
+  renderPage(id);
+  if(window.innerWidth<768) document.getElementById('sidebar').classList.remove('mobile-open');
+}
+
+function renderPage(id){
+  if(id==='dashboard') renderDashboard();
+  else if(id==='minha-turma') renderMinhaTurma();
+  else if(id==='livro-turma') renderLivroTurma();
+  else if(id==='presencas') renderPresencasPage();
+  else if(id==='notas') renderNotas();
+  else if(id==='pautas') renderPautaProf();
+  else if(id==='comunicados') renderComunicados();
+  else if(id==='assinatura') renderAssinatura();
+  populateSelects();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// PROFESSOR
+// ════════════════════════════════════════════════════════════════════════
+function setProfessor(){
+  currentProf = document.getElementById('professorSelect').value;
+  document.getElementById('profBadge').textContent = '👨‍🏫 ' + (currentProf||'Professor');
+  document.getElementById('sig-prof-name').textContent = currentProf||'Nome do Professor';
+  document.getElementById('livro-prof').textContent = currentProf||'—';
+  document.getElementById('dash-prof-name').textContent = currentProf||'Seleccione o seu perfil acima';
+  renderDashboard();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════════════════
+function renderDashboard(){
+  const alunos = getData('alunos');
+  const freqs = getData('frequencias');
+  const today_iso = todayISO();
+  const hoje_freqs = freqs.filter(f=>f.data===today_iso);
+  const presentes = hoje_freqs.filter(f=>f.presente).length;
+  const faltas = hoje_freqs.filter(f=>!f.presente).length;
+  const avaliados = alunos.filter(a=>a.notas).length;
+
+  document.getElementById('d-alunos').textContent = alunos.length;
+  document.getElementById('d-presentes').textContent = presentes;
+  document.getElementById('d-faltas').textContent = faltas;
+  document.getElementById('d-avaliados').textContent = avaliados;
+  document.getElementById('d-today').textContent = today();
+  document.getElementById('dash-date').textContent = today();
+
+  // Hoje
+  document.getElementById('d-hoje').innerHTML = hoje_freqs.length
+    ? hoje_freqs.slice(0,5).map(f=>{
+        const a=alunos.find(x=>x.id===f.studentId);
+        if(!a) return '';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--lgray)">
+          <div class="avatar">${a.foto?`<img src="${a.foto}">`:(a.nome[0]||'?').toUpperCase()}</div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">${a.nome}</div><div style="font-size:10px;color:var(--gray)">${a.curso}</div></div>
+          <span class="badge ${f.presente?'presente':'falta'}">${f.presente?'Presente':'Falta'}</span>
+        </div>`;}).join('')
+    : '<p style="text-align:center;color:var(--gray);font-size:13px;padding:20px 0">Sem presenças marcadas hoje.<br>Vá a "Marcar Presenças".</p>';
+
+  // Faltas list
+  const faltaCount = {};
+  freqs.filter(f=>!f.presente).forEach(f=>{faltaCount[f.studentId]=(faltaCount[f.studentId]||0)+1;});
+  const sorted = Object.entries(faltaCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  document.getElementById('d-faltas-list').innerHTML = sorted.length
+    ? sorted.map(([sid,n])=>{
+        const a=alunos.find(x=>x.id===sid);
+        if(!a) return '';
+        const totalAulas = freqs.filter(f=>f.studentId===sid).length||1;
+        const pct = Math.round((n/totalAulas)*100);
+        const cls = pct>50?'danger':pct>25?'warn':'';
+        return `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span><strong>${a.nome}</strong></span>
+            <span style="color:${pct>50?'var(--red)':'var(--orange)'}"><strong>${n} falta${n>1?'s':''}</strong> (${pct}%)</span>
+          </div>
+          <div class="progress"><div class="progress-bar ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
+        </div>`;}).join('')
+    : '<p style="text-align:center;color:var(--green);font-size:13px;padding:20px 0">✅ Nenhum aluno com excesso de faltas!</p>';
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// MINHA TURMA
+// ════════════════════════════════════════════════════════════════════════
+function renderMinhaTurma(){
+  const alunos = getData('alunos');
+  const cursos = [...new Set(alunos.map(a=>a.curso))];
+  const sel = document.getElementById('turma-filter');
+  sel.innerHTML = '<option value="">Todos os cursos</option>' + cursos.map(c=>`<option>${c}</option>`).join('');
+
+  const filter = sel.value;
+  const list = filter ? alunos.filter(a=>a.curso===filter) : alunos;
+  const freqs = getData('frequencias');
+
+  document.getElementById('turma-body').innerHTML = list.map(a=>{
+    const aFreqs = freqs.filter(f=>f.studentId===a.id);
+    const totalAulas = aFreqs.length;
+    const faltas = aFreqs.filter(f=>!f.presente).length;
+    const assiduidade = totalAulas>0 ? Math.round(((totalAulas-faltas)/totalAulas)*100) : 100;
+    const cls = assiduidade<75?'danger':assiduidade<90?'warn':'';
+    return `<tr>
+      <td><div class="avatar">${a.foto?`<img src="${a.foto}">`:(a.nome[0]||'?').toUpperCase()}</div></td>
+      <td><strong>${a.nome}</strong></td>
+      <td style="font-size:11px;color:var(--blue)">${a.numAluno}</td>
+      <td>${a.curso}</td>
+      <td>${a.horario}</td>
+      <td>
+        <div style="font-size:11px;margin-bottom:3px;color:${assiduidade<75?'var(--red)':'var(--green)'}"><strong>${assiduidade}%</strong> (${faltas} falta${faltas!==1?'s':''})</div>
+        <div class="progress" style="width:120px"><div class="progress-bar ${cls}" style="width:${assiduidade}%"></div></div>
+      </td>
+      <td><span class="badge ${a.estado}">${a.estado}</span></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px">Nenhum aluno encontrado.</td></tr>';
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// LIVRO DE TURMA
+// ════════════════════════════════════════════════════════════════════════
+function renderLivroTurma(){
+  const alunos = getData('alunos');
+  const cursos = [...new Set(alunos.map(a=>a.curso))];
+  const sel = document.getElementById('livro-curso');
+  sel.innerHTML = '<option value="">Todos</option>' + cursos.map(c=>`<option>${c}</option>`).join('');
+  renderLivro();
+}
+
+function renderLivro(){
+  const curso = document.getElementById('livro-curso').value;
+  let alunos = getData('alunos');
+  if(curso) alunos = alunos.filter(a=>a.curso===curso);
+  if(!alunos.length){ document.getElementById('livro-body').innerHTML='<p style="text-align:center;color:var(--gray);padding:20px;font-size:13px">Nenhum aluno neste curso.</p>'; return; }
+
+  const freqs = getData('frequencias');
+  const allDates = [...new Set(freqs.map(f=>f.data))].sort();
+  const lastDates = allDates.slice(-10);
+
+  document.getElementById('livro-body').innerHTML = `
+    <div style="overflow-x:auto">
+      <table style="min-width:700px">
+        <thead>
+          <tr>
+            <th style="min-width:160px">Nome</th>
+            ${lastDates.map(d=>`<th style="min-width:70px;text-align:center;font-size:10px">${d.split('-').slice(1).reverse().join('/')}</th>`).join('')}
+            <th>Faltas</th>
+            <th>Assid.</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${alunos.map(a=>{
+            const aFreqs = freqs.filter(f=>f.studentId===a.id);
+            const faltas = aFreqs.filter(f=>!f.presente).length;
+            const total = aFreqs.length;
+            const assid = total>0?Math.round(((total-faltas)/total)*100):100;
+            return `<tr>
+              <td><div style="display:flex;align-items:center;gap:8px">
+                <div class="avatar" style="width:28px;height:28px;font-size:10px">${a.foto?`<img src="${a.foto}">`:(a.nome[0]||'?').toUpperCase()}</div>
+                <span style="font-size:12px;font-weight:600">${a.nome}</span>
+              </div></td>
+              ${lastDates.map(d=>{
+                const f=freqs.find(x=>x.studentId===a.id&&x.data===d);
+                if(!f) return `<td style="text-align:center;color:var(--gray)">—</td>`;
+                return `<td style="text-align:center">
+                  <span style="font-size:14px">${f.presente?'✅':'❌'}</span>
+                </td>`;
+              }).join('')}
+              <td style="text-align:center"><strong style="color:${faltas>3?'var(--red)':'var(--dark)'}">${faltas}</strong></td>
+              <td style="text-align:center"><strong style="color:${assid<75?'var(--red)':assid<90?'var(--orange)':'var(--green)'}">${assid}%</strong></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:16px;padding:12px;background:var(--off);border-radius:8px;font-size:11px;color:var(--gray)">
+      ✅ Presente · ❌ Falta · — Sem registo · Mínimo de assiduidade: <strong>75%</strong>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm" onclick="printLivro()">🖨️ Imprimir Livro de Turma</button>
+    </div>`;
+}
+
+function printLivro(){
+  const w = window.open('','_blank');
+  w.document.write(`<html><head><title>Livro de Turma</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px}
+  h1{color:#1B3A6B;font-size:15px;margin-bottom:4px}p{font-size:11px;color:#666;margin-bottom:16px}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th{background:#1B3A6B;color:#C9A02A;padding:7px 8px;text-align:left}
+  td{padding:6px 8px;border-bottom:1px solid #eee}
+  @media print{body{padding:10px}}</style></head>
+  <body>
+  <h1>CFTPM Moztechwave — Livro de Turma Digital</h1>
+  <p>Professor: ${currentProf||'—'} · Data de impressão: ${today()}</p>
+  ${document.getElementById('livro-body').innerHTML}
+  <script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// PRESENÇAS
+// ════════════════════════════════════════════════════════════════════════
+function renderPresencasPage(){
+  const cursos = [...new Set(getData('alunos').map(a=>a.curso))];
+  const sel = document.getElementById('pres-curso');
+  sel.innerHTML = '<option value="">Todos os cursos</option>' + cursos.map(c=>`<option>${c}</option>`).join('');
+  document.getElementById('pres-data').value = todayISO();
+  loadPresencas();
+}
+
+function loadPresencas(){
+  const data = document.getElementById('pres-data').value;
+  const curso = document.getElementById('pres-curso').value;
+  let alunos = getData('alunos').filter(a=>a.estado==='activo');
+  if(curso) alunos = alunos.filter(a=>a.curso===curso);
+  const freqs = getData('frequencias');
+
+  const presentes = alunos.filter(a=>{
+    const f=freqs.find(x=>x.studentId===a.id&&x.data===data);
+    return f?f.presente:true;
+  }).length;
+  const faltas = alunos.length - presentes;
+
+  document.getElementById('pres-summary').innerHTML = [
+    ['Total',alunos.length,'var(--blue)'],
+    ['Presentes',presentes,'var(--green)'],
+    ['Faltas',faltas,'var(--red)'],
+  ].map(([l,n,c])=>`<div style="background:var(--off);border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:8px">
+    <span style="font-size:18px;font-weight:700;color:${c}">${n}</span>
+    <span style="font-size:11px;color:var(--gray)">${l}</span>
+  </div>`).join('');
+
+  document.getElementById('pres-body').innerHTML = alunos.map(a=>{
+    const f = freqs.find(x=>x.studentId===a.id&&x.data===data)||{presente:true,tipo:'',obs:''};
+    return `<tr>
+      <td><div class="avatar">${a.foto?`<img src="${a.foto}">`:(a.nome[0]||'?').toUpperCase()}</div></td>
+      <td><strong>${a.nome}</strong></td>
+      <td>${a.curso}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="pres-btn ${f.presente?'presente':''}" data-id="${a.id}" data-val="presente" onclick="setPres(this,'${a.id}','presente')">✅ Presente</button>
+          <button class="pres-btn ${!f.presente&&f.tipo==='injustificada'?'falta':''}" data-id="${a.id}" data-val="injustificada" onclick="setPres(this,'${a.id}','injustificada')">❌ Falta</button>
+          <button class="pres-btn ${!f.presente&&f.tipo==='justificada'?'justificada':''}" data-id="${a.id}" data-val="justificada" onclick="setPres(this,'${a.id}','justificada')">📋 Justif.</button>
+        </div>
+      </td>
+      <td><span id="tipo-${a.id}" style="font-size:11px;color:var(--gray)">${f.tipo||'—'}</span></td>
+      <td><input type="text" id="obs-${a.id}" value="${f.obs||''}" placeholder="Observação..." style="border:1px solid var(--lgray);border-radius:6px;padding:5px 8px;font-size:11px;outline:none;width:160px"></td>
+    </tr>`;
+  }).join('');
+}
+
+function setPres(btn, id, tipo){
+  // Update UI
+  const row = btn.closest('tr');
+  row.querySelectorAll('.pres-btn').forEach(b=>b.classList.remove('presente','falta','justificada'));
+  if(tipo==='presente') btn.classList.add('presente');
+  else if(tipo==='injustificada') btn.classList.add('falta');
+  else btn.classList.add('justificada');
+  document.getElementById('tipo-'+id).textContent = tipo;
+}
+
+function marcarTodosPresentes(){
+  document.querySelectorAll('.pres-btn[data-val="presente"]').forEach(btn=>{
+    const row = btn.closest('tr');
+    row.querySelectorAll('.pres-btn').forEach(b=>b.classList.remove('presente','falta','justificada'));
+    btn.classList.add('presente');
+  });
+  showToast('✅ Todos marcados como presentes!');
+}
+
+function salvarPresencas(){
+  const data = document.getElementById('pres-data').value;
+  if(!data){ showToast('⚠️ Seleccione uma data',true); return; }
+  const alunos = getData('alunos');
+  let freqs = getData('frequencias').filter(f=>f.data!==data);
+
+  alunos.forEach(a=>{
+    const presBtn = document.querySelector(`.pres-btn.presente[data-id="${a.id}"]`);
+    const faltaBtn = document.querySelector(`.pres-btn.falta[data-id="${a.id}"]`);
+    const justBtn = document.querySelector(`.pres-btn.justificada[data-id="${a.id}"]`);
+    const presente = !!presBtn || (!faltaBtn && !justBtn);
+    const tipo = faltaBtn?'injustificada':justBtn?'justificada':'';
+    const obs = document.getElementById('obs-'+a.id)?.value||'';
+    freqs.push({studentId:a.id,data,presente,tipo,obs,professor:currentProf});
+  });
+  setData('frequencias',freqs);
+  showToast('✅ Presenças guardadas para '+data+'!');
+  renderDashboard();
+}
+
+function renderHistPresenca(){
+  const id = document.getElementById('hist-aluno').value;
+  if(!id){ document.getElementById('hist-pres-body').innerHTML=''; return; }
+  const freqs = getData('frequencias').filter(f=>f.studentId===id);
+  if(!freqs.length){ document.getElementById('hist-pres-body').innerHTML='<p style="color:var(--gray);font-size:13px">Nenhum registo de presença.</p>'; return; }
+  const sorted = [...freqs].sort((a,b)=>b.data.localeCompare(a.data));
+  document.getElementById('hist-pres-body').innerHTML = `
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Data</th><th>Presença</th><th>Tipo</th><th>Observação</th><th>Professor</th></tr></thead>
+        <tbody>${sorted.map(f=>`<tr>
+          <td>${f.data}</td>
+          <td><span class="badge ${f.presente?'presente':'falta'}">${f.presente?'Presente':'Falta'}</span></td>
+          <td style="font-size:11px">${f.tipo||'—'}</td>
+          <td style="font-size:11px">${f.obs||'—'}</td>
+          <td style="font-size:11px">${f.professor||'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// NOTAS
+// ════════════════════════════════════════════════════════════════════════
+function renderNotas(){
+  const cursos = [...new Set(getData('alunos').map(a=>a.curso))];
+  const sel = document.getElementById('notas-curso');
+  sel.innerHTML = '<option value="">Todos os cursos</option>' + cursos.map(c=>`<option>${c}</option>`).join('');
+  const curso = sel.value;
+  let alunos = getData('alunos');
+  if(curso) alunos = alunos.filter(a=>a.curso===curso);
+
+  document.getElementById('notas-body').innerHTML = alunos.map(a=>{
+    const n = a.notas||{};
+    const media = n.t1&&n.t2&&n.exame?((+n.t1+ +n.t2+ +n.exame)/3).toFixed(1):'—';
+    const pass = media!=='—'&&+media>=10;
+    return `<tr>
+      <td><strong>${a.nome}</strong></td>
+      <td>${a.curso}</td>
+      <td><div class="grade-box ${n.t1?(n.t1>=10?'pass':'fail'):'empty'}">${n.t1||'—'}</div></td>
+      <td><div class="grade-box ${n.t2?(n.t2>=10?'pass':'fail'):'empty'}">${n.t2||'—'}</div></td>
+      <td><div class="grade-box ${n.exame?(n.exame>=10?'pass':'fail'):'empty'}">${n.exame||'—'}</div></td>
+      <td><strong style="color:${media!=='—'?(+media>=10?'var(--green)':'var(--red)'):'var(--gray)'};font-size:14px">${media}</strong></td>
+      <td>${media!=='—'?`<span class="badge ${pass?'aprovado':'reprovado'}">${pass?'APROVADO':'REPROVADO'}</span>`:'—'}</td>
+      <td><button class="btn btn-blue btn-sm" onclick="editNota('${a.id}')">✏️</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px">Nenhum aluno.</td></tr>';
+}
+
+function editNota(id){
+  const a = getData('alunos').find(x=>x.id===id);
+  if(!a) return;
+  document.getElementById('mn-aluno').value = id;
+  document.getElementById('mn-t1').value = a.notas?.t1||'';
+  document.getElementById('mn-t2').value = a.notas?.t2||'';
+  document.getElementById('mn-ex').value = a.notas?.exame||'';
+  calcMedia();
+  openModal('modal-nota');
+}
+
+function calcMedia(){
+  const t1=+document.getElementById('mn-t1').value||0;
+  const t2=+document.getElementById('mn-t2').value||0;
+  const ex=+document.getElementById('mn-ex').value||0;
+  if(t1||t2||ex){
+    const m=((t1+t2+ex)/3).toFixed(1);
+    document.getElementById('mn-media').value=m+' valores — '+(+m>=10?'APROVADO':'REPROVADO');
+    document.getElementById('mn-media').style.color=+m>=10?'var(--green)':'var(--red)';
+  }
+}
+
+['mn-t1','mn-t2','mn-ex'].forEach(id=>document.getElementById(id)?.addEventListener('input',calcMedia));
+
+function salvarNota(){
+  const id = document.getElementById('mn-aluno').value;
+  if(!id){ showToast('⚠️ Seleccione um aluno',true); return; }
+  const t1=+document.getElementById('mn-t1').value;
+  const t2=+document.getElementById('mn-t2').value;
+  const exame=+document.getElementById('mn-ex').value;
+  if([t1,t2,exame].some(n=>n<0||n>20)){ showToast('⚠️ Notas entre 0 e 20',true); return; }
+  const alunos = getData('alunos');
+  const idx = alunos.findIndex(a=>a.id===id);
+  if(idx>=0){ alunos[idx].notas={t1,t2,exame,professor:currentProf,data:todayISO()}; setData('alunos',alunos); }
+  closeModal('modal-nota');
+  showToast('✅ Nota lançada com sucesso!');
+  renderNotas();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// PAUTAS (readonly)
+// ════════════════════════════════════════════════════════════════════════
+function renderPautaProf(){
+  const cursos = [...new Set(getData('alunos').map(a=>a.curso))];
+  const sel = document.getElementById('pauta-curso-prof');
+  sel.innerHTML = '<option value="">Todos os cursos</option>' + cursos.map(c=>`<option>${c}</option>`).join('');
+  buildPautaProf();
+}
+
+function buildPautaProf(){
+  const curso = document.getElementById('pauta-curso-prof')?.value||'';
+  let alunos = getData('alunos');
+  if(curso) alunos = alunos.filter(a=>a.curso===curso);
+  const grouped = {};
+  alunos.forEach(a=>{ if(!grouped[a.curso])grouped[a.curso]=[]; grouped[a.curso].push(a); });
+  document.getElementById('pauta-prof-body').innerHTML = Object.entries(grouped).map(([c,list])=>`
+    <div style="margin-bottom:24px">
+      <div style="background:var(--blue);color:var(--gold);padding:8px 12px;border-radius:6px;font-weight:700;font-size:12px;margin-bottom:10px">📚 ${c} — ${list.length} aluno${list.length>1?'s':''}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--off)">
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--lgray)">Nº</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--lgray)">Nome</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--lgray)">T1</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--lgray)">T2</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--lgray)">Exame</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--lgray)">Média</th>
+          <th style="padding:8px 10px;text-align:center;border-bottom:2px solid var(--lgray)">Resultado</th>
+        </tr></thead>
+        <tbody>${list.map((a,i)=>{
+          const n=a.notas||{}; const media=n.t1&&n.t2&&n.exame?((+n.t1+ +n.t2+ +n.exame)/3).toFixed(1):'—'; const pass=media!=='—'&&+media>=10;
+          return `<tr style="${i%2===0?'background:#fafafa':''}">
+            <td style="padding:7px 10px;border-bottom:1px solid var(--lgray)">${i+1}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--lgray);font-weight:600">${a.nome}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--lgray);text-align:center">${n.t1||'—'}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--lgray);text-align:center">${n.t2||'—'}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--lgray);text-align:center">${n.exame||'—'}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--lgray);text-align:center;font-weight:700;color:${media!=='—'?(pass?'var(--green)':'var(--red)'):'var(--gray)'}">${media}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--lgray);text-align:center">
+              ${media!=='—'?`<span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:${pass?'#D1FAE5':'#FEE2E2'};color:${pass?'#065F46':'#991B1B'}">${pass?'APR.':'REP.'}</span>`:'—'}
+            </td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`).join('') || '<p style="text-align:center;color:var(--gray);padding:20px;font-size:13px">Nenhum aluno com notas lançadas.</p>';
+}
+
+function printPauta(){
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Pauta</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px}
+  h1{color:#1B3A6B;font-size:15px;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:11px}
+  th{background:#1B3A6B;color:#C9A02A;padding:7px}td{padding:6px;border-bottom:1px solid #eee}
+  @media print{body{padding:10px}}</style></head>
+  <body><h1>CFTPM Moztechwave · Pauta · Professor: ${currentProf||'—'} · ${today()}</h1>
+  ${document.getElementById('pauta-prof-body').innerHTML}
+  <script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// COMUNICADOS
+// ════════════════════════════════════════════════════════════════════════
+function renderComunicados(){
+  document.getElementById('com-body').innerHTML = comunicados.length
+    ? comunicados.map(c=>`
+      <div style="background:var(--off);border:1.5px solid var(--lgray);border-radius:8px;padding:12px 14px;margin-bottom:10px;border-left:4px solid var(--gold)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <strong style="font-size:13px;color:var(--blue)">${c.titulo}</strong>
+          <span style="font-size:10px;color:var(--gray)">${c.data}</span>
+        </div>
+        <p style="font-size:12px;color:var(--dark);margin-bottom:5px">${c.msg}</p>
+        <span style="font-size:10px;color:var(--gray)">📚 ${c.curso||'Todos'} · 👨‍🏫 ${c.professor||'—'}</span>
+      </div>`).join('')
+    : '<p style="text-align:center;color:var(--gray);font-size:13px;padding:20px">Nenhum comunicado publicado ainda.</p>';
+}
+
+function salvarComunicado(){
+  const titulo = document.getElementById('mc-titulo').value.trim();
+  const msg = document.getElementById('mc-msg').value.trim();
+  if(!titulo||!msg){ showToast('⚠️ Preencha o título e a mensagem',true); return; }
+  comunicados.unshift({id:genId(),titulo,msg,curso:document.getElementById('mc-curso').value,professor:currentProf,data:today()});
+  setData('prof_comunicados',comunicados);
+  closeModal('modal-comunicado');
+  showToast('📢 Comunicado publicado!');
+  renderComunicados();
+  document.getElementById('mc-titulo').value='';
+  document.getElementById('mc-msg').value='';
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// ASSINATURA DIÁRIA
+// ════════════════════════════════════════════════════════════════════════
+function renderAssinatura(){
+  document.getElementById('sig-date').textContent = today();
+  const assinaturas = getData('assinaturas');
+  const todayStr = todayISO();
+  const todaySignatures = assinaturas.filter(a=>a.data===todayStr);
+
+  document.getElementById('sig-list').innerHTML = todaySignatures.length
+    ? `<div style="background:#D1FAE5;border-radius:8px;padding:12px 14px;margin-bottom:12px">
+        <strong style="color:#065F46">✅ Já assinou hoje:</strong>
+        ${todaySignatures.map(a=>`<div style="font-size:12px;color:#065F46;margin-top:4px">${a.professor} · ${a.hora}</div>`).join('')}
+      </div>`
+    : `<div style="background:#FEF3C7;border-radius:8px;padding:12px 14px;margin-bottom:12px">
+        <strong style="color:#92400E">⚠️ Ainda não assinou hoje.</strong>
+      </div>`;
+
+  // History
+  const sorted = [...assinaturas].sort((a,b)=>b.data.localeCompare(a.data)).slice(0,20);
+  document.getElementById('sig-history').innerHTML = sorted.length
+    ? sorted.map(a=>`
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--lgray);font-size:12px">
+        <div><strong>${a.professor}</strong><div style="font-size:10px;color:var(--gray)">${a.data}</div></div>
+        <div style="text-align:right"><span style="color:var(--green)">✅ Assinado</span><div style="font-size:10px;color:var(--gray)">${a.hora}</div></div>
+      </div>`).join('')
+    : '<p style="text-align:center;color:var(--gray);font-size:13px;padding:20px">Nenhuma assinatura registada ainda.</p>';
+}
+
+function assinarDia(){
+  if(!currentProf){ showToast('⚠️ Seleccione o seu perfil no topo',true); return; }
+  const assinaturas = getData('assinaturas');
+  const todayStr = todayISO();
+  const jaAssinou = assinaturas.find(a=>a.data===todayStr&&a.professor===currentProf);
+  if(jaAssinou){ showToast('⚠️ Já assinou hoje!',true); return; }
+  assinaturas.push({
+    id:genId(),
+    professor:currentProf,
+    data:todayStr,
+    hora:new Date().toLocaleTimeString('pt-MZ',{hour:'2-digit',minute:'2-digit'}),
+    timestamp:Date.now(),
+  });
+  setData('assinaturas',assinaturas);
+  showToast('✍️ Assinatura confirmada para hoje!');
+  renderAssinatura();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════════════
+function populateSelects(){
+  const alunos = getData('alunos');
+  const cursos = [...new Set(alunos.map(a=>a.curso))];
+
+  // nota aluno
+  const mnAluno = document.getElementById('mn-aluno');
+  if(mnAluno) mnAluno.innerHTML = '<option value="">-- Seleccione --</option>' + alunos.map(a=>`<option value="${a.id}">${a.nome} — ${a.curso}</option>`).join('');
+
+  // hist aluno
+  const ha = document.getElementById('hist-aluno');
+  if(ha) ha.innerHTML = '<option value="">-- Seleccione --</option>' + alunos.map(a=>`<option value="${a.id}">${a.nome}</option>`).join('');
+
+  // mc curso
+  const mc = document.getElementById('mc-curso');
+  if(mc) mc.innerHTML = '<option value="">Todos os alunos</option>' + cursos.map(c=>`<option>${c}</option>`).join('');
+}
+
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const main=document.getElementById('main');
+  if(window.innerWidth<768) sb.classList.toggle('mobile-open');
+  else{ sb.classList.toggle('collapsed'); main.classList.toggle('expanded'); }
+}
+
+function toggleDark(){
+  document.body.classList.toggle('dark');
+  document.querySelector('.dark-toggle').textContent=document.body.classList.contains('dark')?'☀️':'🌙';
+}
+
+function showToast(msg,err=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.borderLeftColor=err?'var(--red)':'var(--gold)';
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+function updateClock(){
+  document.getElementById('clock').textContent=new Date().toLocaleString('pt-MZ',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+setInterval(updateClock,1000); updateClock();
+// ── PROFESSOR LOGIN ─────────────────────────────────────────────────────
+let CURRENT_PROF = null;
+function loginProf(nome, cargo, icone){
+  CURRENT_PROF = {nome, cargo, icone};
+  document.getElementById('profLoginWrap').style.display='none';
+  document.getElementById('profBadge').style.display='flex';
+  document.getElementById('profBadge').textContent=icone+' '+nome.split(' ')[0];
+  document.getElementById('logoutBtn').style.display='block';
+  // Update page title
+  document.querySelector('.page-title').textContent='👨‍🏫 '+nome;
+  // Set professor in all forms
+  currentProfessor = nome;
+  if(typeof setProfessor==='function') setProfessor(nome);
+  showToast('✅ Bem-vindo(a), '+nome.split(' ')[0]+'!');
+  renderDashboard();
+}
+function doLogoutProf(){
+  CURRENT_PROF=null;
+  document.getElementById('profLoginWrap').style.display='flex';
+  document.getElementById('profBadge').style.display='none';
+  document.getElementById('logoutBtn').style.display='none';
+}
+document.getElementById('pres-data').value = todayISO();
+document.getElementById('sig-date').textContent = today();
+renderDashboard();
+</script>
+</body>
+</html>
