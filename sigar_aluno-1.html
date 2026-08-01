@@ -527,8 +527,7 @@ function buildCertificado(){
 
   // CERTIFICADO VISUAL — mesmo estilo do Word impresso
   const certNum = a.numeroSerie||'CERT-MTW-'+new Date().getFullYear()+'-'+( a.numAluno||a.id);
-  const certUrl = 'https://sigar-nine.vercel.app/verificar.html?cert='+encodeURIComponent(certNum);
-  const inicio = a.inicio||'—'; const conclusao = a.conclusao||'—';
+  const certUrl = 'https://sigar-nine.vercel.app/verificar-1.html?cert='+encodeURIComponent(certNum)'—'; const conclusao = a.conclusao||'—';
   const duracao = a.duracao||'3 Meses';
   const nat = a.naturalidade||'—'; const tel = a.telefone||'—';
 

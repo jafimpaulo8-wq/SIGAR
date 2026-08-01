@@ -1451,7 +1451,7 @@ body{background:#1a1a2e;display:flex;flex-direction:column;align-items:center;ju
 
 <script>
   new QRCode(document.getElementById('qrCode'), {
-    text: 'SIGAR MOZTECHWAVE|${numSerie}|${a.nome}|${a.curso}|BI:${a.bi||'---'}|NOTA:${med}|${dataEmissao}|NUIT:402029013|VALIDO',
+    text: 'https://sigar-nine.vercel.app/verificar-1.html?cert=${numSerie}&nome=${encodeURIComponent(a.nome)}&bi=${a.bi||''}',
     width: 72, height: 72, colorDark:'#1B3A6B', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.M
   });
   setTimeout(()=>window.print(), 800);
