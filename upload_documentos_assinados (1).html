@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Upload documentos assinados — SIGAR Moztechwave</title>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, getDocs, query, where, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyDKfHUopcqVmYlDZzRhBPKEYiohuCkypB0",
+  authDomain: "sigar-6754a.firebaseapp.com",
+  projectId: "sigar-6754a",
+  storageBucket: "sigar-6754a.firebasestorage.app",
+  messagingSenderId: "43374879416",
+  appId: "1:43374879416:web:cf96eeb62e6f940fb50a4d"
+});
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+let alunoSel = null;
+
+const $ = id => document.getElementById(id);
+function log(msg, ok) {
+  const el = $("log");
+  el.style.display = "block";
+  el.className = ok === false ? "log err" : ok === true ? "log ok" : "log";
+  el.innerHTML = msg;
+}
+
+async function procurar() {
+  const q = ($("q").value || "").trim();
+  if (!q) return log("Escreve BI, nome ou nº de certificado.", false);
+  log("A procurar...");
+  $("result").style.display = "none";
+  alunoSel = null;
+  try {
+    const snap = await getDocs(collection(db, "alunos"));
+    const ql = q.toLowerCase();
+    let hits = [];
+    snap.forEach(d => {
+      const a = d.data();
+      const blob = [a.nome, a.bi, a.numeroSerie, a.numCertificado, a.numeroCarta, d.id].join(" ").toLowerCase();
+      if (blob.includes(ql)) hits.push({ id: d.id, ...a });
+    });
+    if (!hits.length) return log("Nenhum aluno encontrado.", false);
+    // prefer exact BI
+    hits.sort((a, b) => {
+      const ae = (a.bi || "").toLowerCase() === ql ? 0 : 1;
+      const be = (b.bi || "").toLowerCase() === ql ? 0 : 1;
+      return ae - be;
+    });
+    alunoSel = hits[0];
+    $("result").style.display = "block";
+    $("info").innerHTML = `<b>${alunoSel.nome || "—"}</b><br>
+      BI: ${alunoSel.bi || "—"} · Curso: ${alunoSel.curso || "—"}<br>
+      Cert: ${alunoSel.numeroSerie || alunoSel.numCertificado || "—"}<br>
+      ID: <code>${alunoSel.id}</code>`;
+    const d = alunoSel.docsAssinados || {};
+    $("prev").innerHTML = previewDocs(d);
+    log(`Aluno seleccionado: <b>${alunoSel.nome}</b> (${hits.length} resultado(s))`, true);
+  } catch (e) {
+    log("❌ " + e.message, false);
+  }
+}
+
+function previewDocs(d) {
+  const keys = [
+    ["certificadoPdfUrl", "Certificado (PDF)"],
+    ["certificadoFrenteUrl", "Certificado frente"],
+    ["certificadoVersoUrl", "Certificado verso"],
+    ["cartaPdfUrl", "Carta (PDF)"],
+    ["cartaFrenteUrl", "Carta frente"],
+    ["cartaVersoUrl", "Carta verso"]
+  ];
+  const parts = keys.filter(([k]) => d[k]).map(([k, label]) => {
+    const u = d[k];
+    const isImg = /\.(jpg|jpeg|png|webp)(\?|$)/i.test(u) || u.includes("image");
+    return `<div class="prev-item"><span>${label}</span>
+      ${isImg ? `<img src="${u}" alt="">` : `<a href="${u}" target="_blank" rel="noopener">Abrir ficheiro</a>`}
+    </div>`;
+  });
+  return parts.length ? parts.join("") : "<span class='muted'>Ainda sem documentos assinados.</span>";
+}
+
+async function uploadOne(file, path) {
+  const r = ref(storage, path);
+  await uploadBytes(r, file, { contentType: file.type || "application/octet-stream" });
+  return await getDownloadURL(r);
+}
+
+async function gravar() {
+  if (!alunoSel) return log("Procura e selecciona um aluno primeiro.", false);
+  const files = {
+    certificadoPdf: $("fCertPdf").files[0],
+    certificadoFrente: $("fCertF").files[0],
+    certificadoVerso: $("fCertV").files[0],
+    cartaPdf: $("fCartaPdf").files[0],
+    cartaFrente: $("fCartaF").files[0],
+    cartaVerso: $("fCartaV").files[0]
+  };
+  if (!Object.values(files).some(Boolean)) return log("Escolhe pelo menos um ficheiro.", false);
+  $("btn").disabled = true;
+  log("A enviar ficheiros...");
+  try {
+    const id = alunoSel.id;
+    const base = `documentos_assinados/${id}`;
+    const docs = { ...(alunoSel.docsAssinados || {}) };
+    const map = [
+      ["certificadoPdf", "certificadoPdfUrl", "certificado.pdf"],
+      ["certificadoFrente", "certificadoFrenteUrl", "certificado_frente"],
+      ["certificadoVerso", "certificadoVersoUrl", "certificado_verso"],
+      ["cartaPdf", "cartaPdfUrl", "carta.pdf"],
+      ["cartaFrente", "cartaFrenteUrl", "carta_frente"],
+      ["cartaVerso", "cartaVersoUrl", "carta_verso"]
+    ];
+    for (const [fk, field, name] of map) {
+      const file = files[fk];
+      if (!file) continue;
+      const ext = (file.name.split(".").pop() || "bin").toLowerCase();
+      const path = `${base}/${name}.${ext}`;
+      log(`A enviar ${file.name}...`);
+      docs[field] = await uploadOne(file, path);
+    }
+    docs.uploadedAt = new Date().toISOString();
+    docs.uploadedBy = "admin_upload_page";
+    await updateDoc(doc(db, "alunos", id), {
+      docsAssinados: docs,
+      // aliases for simpler queries on verificar
+      certificadoPdfUrl: docs.certificadoPdfUrl || null,
+      certificadoFrenteUrl: docs.certificadoFrenteUrl || null,
+      certificadoVersoUrl: docs.certificadoVersoUrl || null,
+      cartaPdfUrl: docs.cartaPdfUrl || null,
+      cartaFrenteUrl: docs.cartaFrenteUrl || null,
+      cartaVersoUrl: docs.cartaVersoUrl || null,
+      updatedAt: serverTimestamp()
+    });
+    alunoSel.docsAssinados = docs;
+    $("prev").innerHTML = previewDocs(docs);
+    const cert = alunoSel.numeroSerie || alunoSel.numCertificado || "";
+    const bi = alunoSel.bi || "";
+    const link = `https://sigar-nine.vercel.app/verificar-1.html?cert=${encodeURIComponent(cert)}&bi=${encodeURIComponent(bi)}`;
+    log(`✅ Documentos gravados.<br>Verificação: <a href="${link}" target="_blank">${link}</a><br><br>
+      <b>Nota Storage:</b> se o upload falhar por permissão, no Firebase Console → Storage → Rules usa leitura pública na pasta documentos_assinados (ou autenticação).`, true);
+  } catch (e) {
+    log("❌ " + e.message + "<br><br>Se for erro de Storage/permission: Firebase Console → Storage → Rules.", false);
+  } finally {
+    $("btn").disabled = false;
+  }
+}
+
+window.procurar = procurar;
+window.gravar = gravar;
+</script>
+<style>
+:root{--b:#0B1F3A;--g:#C9A02A;--bg:#f1f5f9}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--b);padding:16px}
+.wrap{max-width:520px;margin:0 auto}
+h1{font-size:18px;margin-bottom:4px}
+.sub{font-size:12px;color:#64748b;margin-bottom:14px;line-height:1.4}
+.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+label{display:block;font-size:12px;font-weight:700;margin:10px 0 4px}
+input[type=text],input[type=search]{width:100%;padding:11px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px}
+input[type=file]{width:100%;font-size:12px;margin-top:4px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{border:none;border-radius:10px;padding:12px 16px;font-weight:800;cursor:pointer;font-size:13px}
+.b1{background:var(--g);color:var(--b);width:100%;margin-top:8px}
+.b2{background:var(--b);color:#fff;width:100%;margin-top:12px}
+.b2:disabled{opacity:.5}
+.log{margin-top:12px;padding:12px;border-radius:8px;font-size:13px;line-height:1.45;display:none}
+.log.ok{background:#ecfdf5;border:1px solid #6ee7b7}
+.log.err{background:#fef2f2;border:1px solid #fca5a5}
+#result{display:none}
+.muted{color:#94a3b8;font-size:12px}
+.prev-item{margin:8px 0;padding:8px;background:#f8fafc;border-radius:8px;font-size:12px}
+.prev-item img{display:block;max-width:100%;max-height:120px;margin-top:6px;border-radius:6px}
+.note{font-size:11px;color:#64748b;margin-top:10px;line-height:1.4}
+code{font-size:11px;background:#f1f5f9;padding:1px 4px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📄 Documentos assinados</h1>
+  <p class="sub">Carrega o certificado e a carta (PDF ou foto frente/verso) depois de assinar e carimbar. Aparecem na ficha de verificação.<br>
+  <b>Não altera</b> o botão “Emitir certificado” do admin.</p>
+
+  <div class="card">
+    <label>BI, nome ou nº certificado</label>
+    <input id="q" type="search" placeholder="Ex: 020107314654F ou Filipe">
+    <button class="b1" type="button" onclick="procurar()">🔎 Procurar aluno</button>
+  </div>
+
+  <div class="card" id="result">
+    <div id="info"></div>
+    <hr style="margin:12px 0;border:none;border-top:1px solid #e2e8f0">
+    <label>Certificado — PDF completo (opcional)</label>
+    <input id="fCertPdf" type="file" accept="application/pdf,image/*">
+    <div class="row">
+      <div>
+        <label>Certificado frente</label>
+        <input id="fCertF" type="file" accept="image/*,application/pdf">
+      </div>
+      <div>
+        <label>Certificado verso</label>
+        <input id="fCertV" type="file" accept="image/*,application/pdf">
+      </div>
+    </div>
+    <label>Carta de operador — PDF completo (opcional)</label>
+    <input id="fCartaPdf" type="file" accept="application/pdf,image/*">
+    <div class="row">
+      <div>
+        <label>Carta frente</label>
+        <input id="fCartaF" type="file" accept="image/*,application/pdf">
+      </div>
+      <div>
+        <label>Carta verso</label>
+        <input id="fCartaV" type="file" accept="image/*,application/pdf">
+      </div>
+    </div>
+    <button class="b2" id="btn" type="button" onclick="gravar()">☁ Enviar e gravar no aluno</button>
+    <p class="note">Podes enviar só PDF ou só fotos. O que existir é o que a verificação mostra.</p>
+    <div id="prev" style="margin-top:10px"></div>
+  </div>
+
+  <div id="log" class="log"></div>
+</div>
+</body>
+</html>
